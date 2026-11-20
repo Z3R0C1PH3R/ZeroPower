@@ -21,6 +21,15 @@ constexpr int32_t kTop = 3;
 const lv_color_t kWarnColor = lv_color_hex(0xF9A825);
 const lv_color_t kErrorColor = lv_color_hex(0xE53935);
 
+// Un ajuste de sí/no se pinta como interruptor.
+bool is_toggle(const power::SettingInfo& info) {
+    return info.options.size() == 2 && std::strcmp(info.options[0].value, "on") == 0 &&
+           std::strcmp(info.options[1].value, "off") == 0;
+}
+
+// Verde de «encendido» de iOS: se reconoce al momento, en tema claro y oscuro.
+const lv_color_t kSwitchOn = lv_color_hex(0x34C759);
+
 void set_text(lv_obj_t* label, const std::string& text) {
     const char* current = lv_label_get_text(label);
     if (!current || text != current) {
@@ -86,6 +95,20 @@ void SettingsScreen::build_content(lv_obj_t* content) {
         row_values_[i] = lv_label_create(box);
         lv_obj_set_style_text_font(row_values_[i], value_font ? value_font : &lv_font_montserrat_12, 0);
         lv_obj_align(row_values_[i], LV_ALIGN_RIGHT_MID, -5, 0);
+
+        // Interruptor: pista gris o verde y botón blanco, sin animación (se repinta lo justo).
+        auto* sw = lv_switch_create(box);
+        lv_obj_set_size(sw, 28, 14);
+        lv_obj_align(sw, LV_ALIGN_RIGHT_MID, -5, 0);
+        lv_obj_remove_flag(sw, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_anim_duration(sw, 0, 0);
+        lv_obj_set_style_bg_color(sw, lv_color_hex(0x8E8E93), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(sw, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(sw, kSwitchOn, LV_PART_INDICATOR | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(sw, lv_color_white(), LV_PART_KNOB);
+        lv_obj_set_style_pad_all(sw, -2, LV_PART_KNOB);
+        lv_obj_add_flag(sw, LV_OBJ_FLAG_HIDDEN);
+        row_switches_[i] = sw;
     }
 
     hint_ = lv_label_create(content);
@@ -156,6 +179,10 @@ bool SettingsScreen::handle_key(uint32_t key) {
             if (absent || busy_ || current.empty()) {
                 break;
             }
+            if (is_toggle(info)) {
+                apply_value(info, current == "on" ? "off" : "on");
+                break;
+            }
             const int delta = (key == LV_KEY_LEFT || key == 'z' || key == 'Z') ? -1 : 1;
             const auto it = pending_.find(info.key);
             const std::string from = it != pending_.end() ? it->second : current;
@@ -174,39 +201,10 @@ bool SettingsScreen::handle_key(uint32_t key) {
             if (absent || busy_ || current.empty()) {
                 break;
             }
-            // Sin valor elegido, ENTER pasa al siguiente (como un interruptor).
-            std::string target = pending_.count(info.key) ? pending_[info.key] : power::step_option(info, current, 1);
-            const bool losing_remote = info.warn_remote && target == "off";
-            if (losing_remote && confirm_key_ != info.key) {
-                pending_[info.key] = target;
-                confirm_key_ = info.key;
-                break;
-            }
-            confirm_key_.clear();
-            pending_.erase(info.key);
-            const std::string key_name = info.key;
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                message_ = "Applying " + std::string(info.title) + "…";
-                message_error_ = false;
-            }
-            start_job([this, key_name, target]() {
-                const auto result = control_.apply(key_name, target);
-                auto values = control_.read_all();
-                std::lock_guard<std::mutex> lock(mutex_);
-                values_ = std::move(values);
-                const power::SettingInfo* applied = power::find_setting(key_name);
-                if (result.ok) {
-                    message_ = std::string(applied->title) + ": " + power::option_label(*applied, result.value);
-                    if (applied->needs_reboot) {
-                        message_ += " (reboot to apply)";
-                    }
-                    message_error_ = false;
-                } else {
-                    message_ = std::string(applied->title) + ": " + result.message;
-                    message_error_ = true;
-                }
-            });
+            // Sin valor elegido, ENTER pasa al siguiente (en un interruptor, lo cambia).
+            const std::string target =
+                pending_.count(info.key) ? pending_[info.key] : power::step_option(info, current, 1);
+            apply_value(info, target);
             break;
         }
         default:
@@ -214,6 +212,45 @@ bool SettingsScreen::handle_key(uint32_t key) {
     }
     refresh();
     return true;
+}
+
+void SettingsScreen::apply_value(const power::SettingInfo& info, const std::string& target) {
+    const bool losing_remote = info.warn_remote && target == "off";
+    if (losing_remote && confirm_key_ != info.key) {
+        // Wi-Fi o Tailscale: el primer intento sólo avisa; el segundo apaga.
+        if (!is_toggle(info)) {
+            pending_[info.key] = target;
+        }
+        confirm_key_ = info.key;
+        return;
+    }
+    confirm_key_.clear();
+    pending_.erase(info.key);
+    applying_key_ = info.key;
+    applying_value_ = target;
+    const std::string key_name = info.key;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        message_ = "Applying " + std::string(info.title) + "…";
+        message_error_ = false;
+    }
+    start_job([this, key_name, target]() {
+        const auto result = control_.apply(key_name, target);
+        auto values = control_.read_all();
+        std::lock_guard<std::mutex> lock(mutex_);
+        values_ = std::move(values);
+        const power::SettingInfo* applied = power::find_setting(key_name);
+        if (result.ok) {
+            message_ = std::string(applied->title) + ": " + power::option_label(*applied, result.value);
+            if (applied->needs_reboot) {
+                message_ += " (reboot to apply)";
+            }
+            message_error_ = false;
+        } else {
+            message_ = std::string(applied->title) + ": " + result.message;
+            message_error_ = true;
+        }
+    });
 }
 
 void SettingsScreen::refresh() {
@@ -249,6 +286,28 @@ void SettingsScreen::refresh() {
         const auto it = values.find(info.key);
         const auto pend = pending_.find(info.key);
         bool dim = false;
+        const bool have_value = loaded && it != values.end() && it->second != "absent";
+        if (is_toggle(info) && have_value) {
+            // Mientras se aplica, el interruptor ya enseña el valor nuevo; si falla, vuelve.
+            const bool applying = busy_ && applying_key_ == info.key;
+            const std::string shown = applying ? applying_value_ : it->second;
+            if (shown == "on") {
+                lv_obj_add_state(row_switches_[i], LV_STATE_CHECKED);
+            } else {
+                lv_obj_remove_state(row_switches_[i], LV_STATE_CHECKED);
+            }
+            // Pendiente de confirmar (apagar Wi-Fi/Tailscale): el interruptor se pone ámbar.
+            lv_obj_set_style_bg_color(row_switches_[i], confirm_key_ == info.key ? kWarnColor : kSwitchOn,
+                                      LV_PART_INDICATOR | LV_STATE_CHECKED);
+            lv_obj_set_style_border_width(row_switches_[i], selected ? 1 : 0, LV_PART_MAIN);
+            lv_obj_set_style_border_color(row_switches_[i], colors.background, LV_PART_MAIN);
+            lv_obj_remove_flag(row_switches_[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(row_values_[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_color(row_titles_[i], selected ? colors.background : colors.text, 0);
+            continue;
+        }
+        lv_obj_add_flag(row_switches_[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(row_values_[i], LV_OBJ_FLAG_HIDDEN);
         if (!loaded || it == values.end()) {
             text = "…";
         } else if (it->second == "absent") {
@@ -281,7 +340,7 @@ void SettingsScreen::refresh() {
     std::string status;
     lv_color_t status_color = colors.text_disabled;
     if (!confirm_key_.empty()) {
-        status = "Remote access will be lost. ENTER again to confirm.";
+        status = "Remote access will be lost. Press again to turn off.";
         status_color = kWarnColor;
     } else if (busy_ && loaded) {
         status = message.empty() ? "Working…" : message;
@@ -294,7 +353,7 @@ void SettingsScreen::refresh() {
         status = message;
         status_color = message_error ? kErrorColor : colors.text_disabled;
     } else {
-        status = control_.simulated() ? "Simulated system (no helper)" : "F/X row   Z/C value   ENTER apply";
+        status = control_.simulated() ? "Simulated system (no helper)" : "F/X choose   ENTER switch / apply";
     }
     set_text(status_, status);
     lv_obj_set_style_text_color(status_, status_color, 0);

@@ -46,8 +46,9 @@ volver a aplicarlo. **Al desinstalar ZeroPower, todo lo que cambió vuelve a com
 | | `Esc` / mantener `Esc` | Atrás / salir |
 | Menú | `F` / `X` · `ENTER` | Elegir · abrir |
 | Ajustes | `F` / `X` | Elegir ajuste |
-| | `Z` / `C` | Elegir valor (queda marcado con `•`) |
-| | `ENTER` | Aplicar (sin valor elegido, pasa al siguiente) |
+| | `ENTER` (o `Z` / `C`) en un interruptor | Encender / apagar al momento (Wi-Fi y Tailscale piden pulsar otra vez para apagar) |
+| | `Z` / `C` en uno de varias opciones | Elegir valor (queda marcado con `•`) |
+| | `ENTER` | Aplicar el valor elegido (sin elegir, pasa al siguiente) |
 | | `Esc` | Descartar lo elegido / volver |
 | Battery | `R` | Empezar la media de cero |
 
@@ -116,5 +117,5 @@ el simulador no está el ayudante: la app simula el sistema en memoria.
 
 ## Estado
 
-**0.1.0** (20-nov-2026): primera versión. Probada en el simulador; en el aparato, el ayudante
+**0.1.1** (20-nov-2026): los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
 lee bien el estado del sistema. Falta probar en el aparato cada ajuste y el servicio.

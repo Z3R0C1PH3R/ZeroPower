@@ -85,6 +85,12 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 
 ## Estado
 
+- **0.1.1 (20-nov-2026) — interruptores.** Los ajustes de sí/no son un `lv_switch` al estilo
+  de iOS (verde `#34C759`, sin animación), que `ENTER`, `Z` o `C` cambian y aplican al momento
+  (lo pidió Bruno: «más fácil un interruptor estilo Apple»). Mientras se aplica ya enseña el
+  valor nuevo; si falla, vuelve. Apagar Wi-Fi o Tailscale lo pone ámbar y pide otra pulsación.
+  Los de varias opciones siguen con `‹ valor ›` + `ENTER`. Probado en el simulador.
+
 - **0.1.0 (20-nov-2026) — primera versión; instalada en el aparato.**
   - Probada en el simulador (las cuatro pantallas, elegir y aplicar, la confirmación de
     Tailscale/Wi-Fi) y, en el aparato, el ayudante (`status`, `set` por sudo sin contraseña),
