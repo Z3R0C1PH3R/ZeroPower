@@ -3,11 +3,7 @@
 # and put back every system setting the app changed, as it was before.
 set -e
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
-    user=$(getent passwd 1000 | cut -d: -f1)
-    if [ -n "$user" ] && [ -d /run/user/1000/systemd ]; then
-        systemctl --user -M "$user@" stop zeropowerd.service >/dev/null 2>&1 || true
-    fi
-    systemctl --global disable zeropowerd.service >/dev/null 2>&1 || true
+    systemctl disable --now zeropowerd.service >/dev/null 2>&1 || true
     /usr/lib/zeropower/zeropower-helper restore || true
 fi
 exit 0

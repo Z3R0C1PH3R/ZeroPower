@@ -1,4 +1,0 @@
-# ZeroPower: the app changes system power settings through this one helper, which only
-# accepts a fixed list of settings and values (see the script). Members of "sudo" can
-# already run anything with their password; this only spares the prompt for the helper.
-%sudo ALL=(root) NOPASSWD: /usr/lib/zeropower/zeropower-helper set *, /usr/lib/zeropower/zeropower-helper restore

@@ -1,12 +1,17 @@
 [Unit]
 Description=ZeroPower: screen-off saver, quiet launcher and low-battery power-off
 Documentation=https://github.com/baltamir1978/ZeroPower
+After=systemd-user-sessions.service
 
 [Service]
 Type=simple
+# El usuario del aparato (uid 1000), no root: pausa su lanzador y mueve su audio.
+User=1000
+Group=1000
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 ExecStart=/usr/lib/zeropower/zeropowerd
 Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

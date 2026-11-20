@@ -44,14 +44,18 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   y `power_logic` (media del consumo, horas que quedan, `LowBatteryGuard`, `IdleTracker`).
 - **Ajustes del sistema**: el sistema es la fuente de verdad. `packaging/zeropower-helper`
   (bash, se instala en `/usr/lib/zeropower/`): `status` sin root; `set <ajuste> <valor>` y
-  `restore` con root, por `sudo -n` gracias a `/etc/sudoers.d/zeropower` (grupo `sudo`, sólo ese
-  ayudante; **validarlo con `visudo -c -f` antes de cambiarlo**: un sudoers roto deja sudo
-  inservible). Guarda el original de cada ajuste en `/var/lib/zeropower/original/` y `restore`
+  `restore` con root, por `sudo -n` con el sudo sin contraseña que trae el usuario del aparato
+  (`bruno ALL=(ALL) NOPASSWD:ALL` en `90-cloud-init-users`, del Imager). **La tienda no deja
+  instalar sudoers** (ni en `/etc/sudoers.d` ni desde los scripts: busca `/etc/sudoers`), ni
+  polkit. Guarda el original de cada ajuste en `/var/lib/zeropower/original/` y `restore`
   (en el `prerm`) lo devuelve. **No hay servicio de root al arrancar** (la tienda rechaza
   servicios de root): todo queda puesto en el sistema (servicios, regla de udev
   `70-zeropower-ethernet.rules`, `config.txt`, la radio del wifi, un *drop-in* de journald).
-- **`zeropowerd`** (`src/daemon/`): servicio **de usuario** (`/usr/lib/systemd/user`, activado
-  con `systemctl --global enable` en el `postinst`), como el lanzador (`APPLaunch.service`).
+- **`zeropowerd`** (`src/daemon/`): servicio **del sistema** en `/usr/lib/systemd/system/`
+  con `User=1000` y `XDG_RUNTIME_DIR=/run/user/1000` (la tienda sólo admite unidades ahí, con
+  el nombre del paquete y que no corran como root; una unidad de usuario en
+  `/usr/lib/systemd/user` la rechaza). Apagar: `systemctl poweroff` y, si polkit no lo deja
+  desde un servicio, `sudo -n`.
   Opciones en `~/.config/zeropower/power.conf` (la app lo reescribe con temporal + rename; el
   servicio mira el `mtime` cada 3 s). Duerme en `poll()` sobre el teclado (1 s de tope).
   Pantalla apagada = `/sys/class/backlight/backlight/brightness` a 0 durante 5 s → `pactl`
@@ -84,6 +88,15 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   Icono: `Tools/generar_icono.py`.
 
 ## Estado
+
+- **0.1.2 (20-nov-2026) — lo que pide la tienda.** El primer envío (0.1.1, PR #571) lo rechazó
+  la validación de rutas: `/etc/sudoers.d/zeropower` y `usr/lib/systemd/user/zeropowerd.service`.
+  Fuera el sudoers (se usa el sudo sin contraseña del usuario) y el servicio pasa a ser de
+  sistema con `User=1000`. Reglas: `.github/scripts/install_path_policy.py` de
+  `CardputerZero/packages`. Instalada en el aparato (servicio como `bruno`, sudoers fuera).
+  **Enviada a la tienda: [#572](https://github.com/CardputerZero/packages/pull/572)**, CI en
+  verde, esperando revisión; vídeo en la release `video-0.1.1` (sin ubicación ni audio). #571
+  cerrado.
 
 - **0.1.1 (20-nov-2026) — interruptores.** Los ajustes de sí/no son un `lv_switch` al estilo
   de iOS (verde `#34C759`, sin animación), que `ENTER`, `Z` o `C` cambian y aplican al momento

@@ -3,7 +3,7 @@
 #
 # ZeroPower: lo único que hace falta hacer como root. La app lo llama con
 #   sudo -n /usr/lib/zeropower/zeropower-helper set <ajuste> <valor>
-# (lo permite /etc/sudoers.d/zeropower) y lee el estado, sin root, con
+# (el usuario del aparato tiene sudo sin contraseña de fábrica) y lee el estado, sin root, con
 #   /usr/lib/zeropower/zeropower-helper status
 #
 # El sistema es la fuente de verdad: cada ajuste se deja puesto donde el sistema lo

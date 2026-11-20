@@ -56,16 +56,19 @@ volver a aplicarlo. **Al desinstalar ZeroPower, todo lo que cambió vuelve a com
 
 - **La app** corre como tu usuario. Lee el estado real con
   `/usr/lib/zeropower/zeropower-helper status` (sin root).
-- **Para cambiar algo** llama a `sudo -n /usr/lib/zeropower/zeropower-helper set <ajuste> <valor>`.
-  `/etc/sudoers.d/zeropower` permite a los del grupo `sudo` ejecutar **sólo ese ayudante** sin
-  contraseña. Es un script de bash corto que acepta una lista cerrada de ajustes y valores;
-  la primera vez que cambia algo guarda su valor original en `/var/lib/zeropower/original/`
-  para poder devolverlo (`zeropower-helper restore`, que se ejecuta al desinstalar).
-- **`zeropowerd`** es un servicio de usuario (como el propio lanzador, `APPLaunch.service`),
-  sin root. Lee sus opciones de `~/.config/zeropower/power.conf`, que la app reescribe. Duerme
-  esperando al teclado y mira el brillo cada segundo y la batería cada 20 s.
+- **Para cambiar algo** llama a `sudo -n /usr/lib/zeropower/zeropower-helper set <ajuste> <valor>`,
+  con el `sudo` sin contraseña que el usuario del aparato ya trae de fábrica (lo pone el
+  Raspberry Pi Imager). ZeroPower **no instala ningún fichero de sudoers** ni da permisos
+  nuevos; sin sudo sin contraseña, la app avisa y no cambia nada. El ayudante es un script de
+  bash corto que acepta una lista cerrada de ajustes y valores; la primera vez que cambia
+  algo guarda su valor original en `/var/lib/zeropower/original/` para poder devolverlo
+  (`zeropower-helper restore`, que se ejecuta al desinstalar).
+- **`zeropowerd`** es un servicio del sistema que corre **como el usuario del aparato**
+  (`User=1000`, el del lanzador), no como root. Lee sus opciones de
+  `~/.config/zeropower/power.conf`, que la app reescribe. Duerme esperando al teclado y mira
+  el brillo cada segundo y la batería cada 20 s.
 
-Ver lo que hace: `journalctl --user -u zeropowerd -f`.
+Ver lo que hace: `journalctl -u zeropowerd -f`.
 
 ## Medidas
 
@@ -117,5 +120,5 @@ el simulador no está el ayudante: la app simula el sistema en memoria.
 
 ## Estado
 
-**0.1.1** (20-nov-2026): los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
+**0.1.2** (20-nov-2026): sin fichero de sudoers y `zeropowerd` como servicio del sistema con el usuario del aparato (lo exige la tienda). **0.1.1**: los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
 lee bien el estado del sistema. Falta probar en el aparato cada ajuste y el servicio.

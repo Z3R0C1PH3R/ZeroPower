@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-// zeropowerd: lo que ZeroPower hace mientras usas el aparato, como servicio del usuario (el
-// mismo que el lanzador, APPLaunch.service), sin root:
+// zeropowerd: lo que ZeroPower hace mientras usas el aparato. Es un servicio del sistema que
+// corre como el usuario del aparato (User=1000, el del lanzador), no como root:
 //
 // - Pantalla apagada (brillo 0) durante 5 s: pausa el lanzador (SIGSTOP) y aparca su audio
 //   en un sumidero nulo para que el amplificador y la tarjeta de sonido duerman. Una tecla o
@@ -323,7 +323,11 @@ int main() {
             if (b.present && low.update(b.discharging(), b.capacity, config.low_battery_percent)) {
                 say("battery at %s %%: powering off", std::to_string(b.capacity));
                 resume_launcher();
-                platform::run_process({"systemctl", "poweroff", "--check-inhibitors=no"});
+                // Desde un servicio (fuera de la sesión) polkit puede no dejarlo: entonces con
+                // el sudo sin contraseña del usuario del aparato.
+                if (platform::run_process({"systemctl", "poweroff", "--check-inhibitors=no"}).exit_code != 0) {
+                    platform::run_process({"sudo", "-n", "systemctl", "poweroff", "--check-inhibitors=no"});
+                }
             }
         }
     }

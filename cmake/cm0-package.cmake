@@ -49,14 +49,11 @@ install(TARGETS zeropowerd
 install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/zeropower-helper"
     DESTINATION "lib/zeropower"
 )
+# La tienda sólo admite unidades en usr/lib/systemd/system (con el nombre del paquete y sin
+# correr como root) y no deja instalar sudoers: el servicio es de sistema con User=1000, y el
+# ayudante se llama con el sudo sin contraseña que ya trae el usuario del aparato.
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/zeropowerd.service"
-    DESTINATION "lib/systemd/user"
-)
-# sudo ignora un fichero de sudoers.d que no sea 0440 (o que escriba alguien más).
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/zeropower.sudoers"
-    DESTINATION "/etc/sudoers.d"
-    RENAME "zeropower"
-    PERMISSIONS OWNER_READ GROUP_READ
+    DESTINATION "lib/systemd/system"
 )
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/images/"

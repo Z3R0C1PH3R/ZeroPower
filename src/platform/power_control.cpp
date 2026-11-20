@@ -128,7 +128,7 @@ PowerControl::Result PowerControl::apply(const std::string& key, const std::stri
             result.message = "Now: " + power::option_label(*info, result.value);
         }
     } else if (line.find("password") != std::string::npos || line.find("sudo") != std::string::npos) {
-        result.message = "Not allowed (sudo)";
+        result.message = "Needs passwordless sudo";
     } else {
         result.message = line.empty() ? "Failed" : line;
     }
