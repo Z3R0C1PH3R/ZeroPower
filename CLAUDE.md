@@ -1,0 +1,96 @@
+# ZeroPower
+
+Ahorro de batería y ajustes de energía para el **M5Stack Cardputer Zero** (Raspberry Pi CM0,
+512 MB, pantalla de 320×170, Debian 13 arm64). En el lanzador se llama **Power**. Qué hace y
+cómo se usa está en `README.md`; aquí va lo que hace falta para tocarla.
+
+No es una app de Android: de `~/CLAUDE.md` valen el estilo (comentarios, documentación y
+commits en español explicando el porqué; pocas dependencias; lógica pura con pruebas), que el
+repositorio es **público** (ni secretos ni datos personales) y la entrega; lo de Gradle, firma
+y GrapheneOS no aplica. **La interfaz está en inglés** (va a la tienda), como ZeroGallery.
+
+## Compilar y comprobar
+
+```sh
+Tools/compilar.sh pruebas   # simulador (SDL2) + ctest; tiene que pasar
+Tools/compilar.sh deb       # dist/ZeroPower_<versión>_rev1_arm64.deb
+Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
+```
+
+- `.cache` es un enlace a `../ZeroTVBGone/.cache` (LVGL y el *sysroot*).
+- **Probar sin pantalla**: simulador bajo `Xvfb :99 -screen 0 900x600x24`
+  (`SDL_RENDER_DRIVER=software`), teclas con `xdotool key --window`, captura de 320×170 con
+  `import -window root -crop 320x170+287+118 +repage`. Sin el ayudante instalado la app simula
+  el sistema en memoria (`PowerControl::simulated`). Para no tocar tu `~/.config`, lanzar con
+  `XDG_CONFIG_HOME=<carpeta>`.
+- **El aparato** es `cpzero` en Tailscale. Se mide el consumo con
+  `/sys/class/power_supply/bq27220-0/current_now` (µA, **negativo al descargar**), media de
+  30 s, desenchufado.
+
+## De dónde viene
+
+- **Base**: ZeroGPS (que viene de la plantilla oficial), con sus arreglos: el bucle de LVGL que
+  duerme de verdad (`lv_delay_set_cb`), todas las letras en evdev y `set_page_handlers(owner…)`.
+- **Ideas y medidas**: [cz-battery-saver](https://github.com/InstantComet/cz-battery-saver)
+  (MIT) — pausar el lanzador con la pantalla apagada, aparcar su audio, Ethernet USB en
+  auto-suspend, apagado con batería baja. **El código es propio**; se le da crédito en el README
+  y en la ficha. El gist de optimización de TheKiwil **no tiene licencia: no se copia nada de
+  él** (lo que coincide es configuración estándar de Debian/Raspberry Pi).
+
+## Cómo está hecha
+
+- **`src/model/`** (puro, con `tests/power_model_test.cpp`): `power_settings` (catálogo de
+  ajustes con título, ayuda, opciones y quién los aplica; `key=value`; opciones del servicio)
+  y `power_logic` (media del consumo, horas que quedan, `LowBatteryGuard`, `IdleTracker`).
+- **Ajustes del sistema**: el sistema es la fuente de verdad. `packaging/zeropower-helper`
+  (bash, se instala en `/usr/lib/zeropower/`): `status` sin root; `set <ajuste> <valor>` y
+  `restore` con root, por `sudo -n` gracias a `/etc/sudoers.d/zeropower` (grupo `sudo`, sólo ese
+  ayudante; **validarlo con `visudo -c -f` antes de cambiarlo**: un sudoers roto deja sudo
+  inservible). Guarda el original de cada ajuste en `/var/lib/zeropower/original/` y `restore`
+  (en el `prerm`) lo devuelve. **No hay servicio de root al arrancar** (la tienda rechaza
+  servicios de root): todo queda puesto en el sistema (servicios, regla de udev
+  `70-zeropower-ethernet.rules`, `config.txt`, la radio del wifi, un *drop-in* de journald).
+- **`zeropowerd`** (`src/daemon/`): servicio **de usuario** (`/usr/lib/systemd/user`, activado
+  con `systemctl --global enable` en el `postinst`), como el lanzador (`APPLaunch.service`).
+  Opciones en `~/.config/zeropower/power.conf` (la app lo reescribe con temporal + rename; el
+  servicio mira el `mtime` cada 3 s). Duerme en `poll()` sobre el teclado (1 s de tope).
+  Pantalla apagada = `/sys/class/backlight/backlight/brightness` a 0 durante 5 s → `pactl`
+  mueve los flujos del lanzador a un `module-null-sink` y `SIGSTOP` al lanzador (no si tiene
+  hijos: una app abierta). Tecla o brillo > 0 → `SIGCONT` y el audio vuelve. Al pararse lo
+  deja todo como estaba.
+- **App**: `SettingsScreen` es la misma lista para los tres grupos (Hardware, Services,
+  Power saving); lee y aplica en un hilo (`PowerControl`). `BatteryScreen`: media de 30 s y
+  barras del último minuto.
+- `platform::run_process` lanza sin shell (lista de argumentos).
+
+## Hardware y medidas (cpzero, 20-nov-2026)
+
+- Pantalla interna: panel SPI `panel-mipi-dbi` (`card1-SPI-1`), 320×170 RGB565: no usa la
+  GPU. `gpu_mem=64` de fábrica; 16 basta (ZeroGallery decodifica vídeo por software).
+- Ethernet USB interno: `0fe6:9900` (SR9900A) en `1-1.1`, detrás de un hub Genesys.
+- Bluetooth por UART (`hci0`); la radio ya venía bloqueada por rfkill.
+- Consumo en reposo, desenchufado: **378 mA** con pantalla y lanzador (brillo 100 %, wifi);
+  con la pantalla apagada y `zeropowerd` (lanzador en pausa, audio aparcado) **301 mA**;
+  **+ Ethernet auto-suspend 209 mA**; Ethernet off, escritorio HDMI off y Bluetooth off no
+  bajan más el consumo (sí liberan RAM: de 235 a 221 MB usados).
+
+## Versiones y entrega
+
+- Versión en `project(... VERSION x.y.z)` de `CMakeLists.txt` y en `app-builder.json`, a la vez.
+- El `.deb` se copia a `~/Documentos/ZeroPower-<versión>.deb`, sustituyendo al anterior.
+- Commit en `main` con mensaje en español que empieza por la versión, y push.
+- Tienda: `../AppBuilder/czdev publish --deb dist/…` (ver la memoria `cardputer-zero-apps`);
+  la primera publicación pide un vídeo en el aparato (**sin metadatos de ubicación**).
+  Icono: `Tools/generar_icono.py`.
+
+## Estado
+
+- **0.1.0 (20-nov-2026) — primera versión; instalada en el aparato.**
+  - Probada en el simulador (las cuatro pantallas, elegir y aplicar, la confirmación de
+    Tailscale/Wi-Fi) y, en el aparato, el ayudante (`status`, `set` por sudo sin contraseña),
+    el sudoers (`visudo -c`) y `zeropowerd` (pausa el lanzador con la pantalla apagada; 0,5 %
+    de CPU, 3 MB). Con el ayudante se dejaron puestos, a petición de Bruno, **Ethernet
+    auto-suspend → off, escritorio HDMI off y Bluetooth off**.
+  - **Sin probar en el aparato**: la app en la pantalla del Cardputer, `gpu_mem` (pide
+    reiniciar), Wi-Fi/Tailscale desde la app, el apagado por batería baja y `restore` al
+    desinstalar.

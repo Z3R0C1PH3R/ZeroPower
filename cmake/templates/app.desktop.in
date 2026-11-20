@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Power
+Comment=@APP_PACKAGE_DESCRIPTION@
+Exec=/usr/bin/@PROJECT_NAME@
+Icon=share/images/zeropower.png
+Terminal=false
+Categories=Utility;
+StartupNotify=false

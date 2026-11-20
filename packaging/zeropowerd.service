@@ -1,0 +1,12 @@
+[Unit]
+Description=ZeroPower: screen-off saver, quiet launcher and low-battery power-off
+Documentation=https://github.com/baltamir1978/ZeroPower
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/zeropower/zeropowerd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

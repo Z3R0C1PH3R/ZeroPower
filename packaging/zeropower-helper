@@ -1,0 +1,317 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# ZeroPower: lo único que hace falta hacer como root. La app lo llama con
+#   sudo -n /usr/lib/zeropower/zeropower-helper set <ajuste> <valor>
+# (lo permite /etc/sudoers.d/zeropower) y lee el estado, sin root, con
+#   /usr/lib/zeropower/zeropower-helper status
+#
+# El sistema es la fuente de verdad: cada ajuste se deja puesto donde el sistema lo
+# recuerda (servicios desactivados, una regla de udev, config.txt, la radio del wifi), así
+# que no hace falta ningún servicio de root al arrancar. La primera vez que se cambia un
+# ajuste se guarda su valor original en /var/lib/zeropower/original/, y `restore` (al
+# desinstalar) los devuelve todos.
+#
+# Todo argumento se valida contra una lista cerrada: nada de lo que llega se ejecuta.
+
+set -u
+export LC_ALL=C
+
+STATE_DIR=/var/lib/zeropower
+ORIG_DIR=$STATE_DIR/original
+ETH_RULE=/etc/udev/rules.d/70-zeropower-ethernet.rules
+JOURNAL_DROPIN=/etc/systemd/journald.conf.d/90-zeropower.conf
+# El chip Ethernet USB interno (SR9900A, driver sr9800/r8152 según el kernel).
+ETH_VENDOR=0fe6
+ETH_PRODUCT=9900
+EXTRA_UNITS="rpcbind.service rpcbind.socket nfs-blkmap.service avahi-daemon.service avahi-daemon.socket apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_all.timer"
+
+die() {
+    echo "zeropower-helper: $*" >&2
+    exit 1
+}
+
+config_txt() {
+    if [ -f /boot/firmware/config.txt ]; then
+        echo /boot/firmware/config.txt
+    else
+        echo /boot/config.txt
+    fi
+}
+
+unit_exists() {
+    systemctl list-unit-files "$1" --no-legend 2>/dev/null | grep -q .
+}
+
+unit_enabled() {
+    [ "$(systemctl is-enabled "$1" 2>/dev/null)" = "enabled" ]
+}
+
+eth_devices() {
+    local d
+    for d in /sys/bus/usb/devices/*; do
+        [ -f "$d/idVendor" ] || continue
+        if [ "$(cat "$d/idVendor")" = "$ETH_VENDOR" ] && [ "$(cat "$d/idProduct")" = "$ETH_PRODUCT" ]; then
+            echo "$d"
+        fi
+    done
+}
+
+# --- Leer el estado ---------------------------------------------------------------
+
+get_ethernet() {
+    if [ -f "$ETH_RULE" ] && grep -q 'authorized}="0"' "$ETH_RULE"; then
+        echo off
+    elif [ -f "$ETH_RULE" ] && grep -q 'power/control}="auto"' "$ETH_RULE"; then
+        echo auto
+    else
+        echo on
+    fi
+}
+
+get_wifi() {
+    if command -v nmcli >/dev/null 2>&1; then
+        [ "$(nmcli radio wifi 2>/dev/null)" = "disabled" ] && echo off || echo on
+    else
+        echo on
+    fi
+}
+
+get_bluetooth() {
+    unit_exists bluetooth.service || { echo absent; return; }
+    unit_enabled bluetooth.service && echo on || echo off
+}
+
+get_hdmi_desktop() {
+    unit_exists lightdm.service || { echo absent; return; }
+    unit_enabled lightdm.service && echo on || echo off
+}
+
+get_gpu_mem() {
+    local v
+    v=$(grep -E '^[[:space:]]*gpu_mem=' "$(config_txt)" 2>/dev/null | tail -1 | cut -d= -f2 | tr -dc 0-9)
+    echo "${v:-64}"
+}
+
+get_tailscale() {
+    unit_exists tailscaled.service || { echo absent; return; }
+    unit_enabled tailscaled.service && echo on || echo off
+}
+
+get_extra_services() {
+    local u
+    for u in $EXTRA_UNITS; do
+        unit_enabled "$u" && { echo on; return; }
+    done
+    echo off
+}
+
+get_journal_ram() {
+    [ -f "$JOURNAL_DROPIN" ] && echo on || echo off
+}
+
+get_value() {
+    case "$1" in
+        ethernet) get_ethernet ;;
+        wifi) get_wifi ;;
+        bluetooth) get_bluetooth ;;
+        hdmi_desktop) get_hdmi_desktop ;;
+        gpu_mem) get_gpu_mem ;;
+        tailscale) get_tailscale ;;
+        extra_services) get_extra_services ;;
+        journal_ram) get_journal_ram ;;
+        *) die "unknown setting: $1" ;;
+    esac
+}
+
+KEYS="ethernet wifi bluetooth hdmi_desktop gpu_mem tailscale extra_services journal_ram"
+
+status() {
+    local k
+    for k in $KEYS; do
+        echo "$k=$(get_value "$k")"
+    done
+    # La memoria de la GPU que hay ahora (la de config.txt vale tras reiniciar).
+    if command -v vcgencmd >/dev/null 2>&1; then
+        echo "gpu_mem_active=$(vcgencmd get_mem gpu 2>/dev/null | tr -dc 0-9)"
+    fi
+}
+
+# --- Cambiar ----------------------------------------------------------------------
+
+remember_original() {
+    mkdir -p "$ORIG_DIR"
+    [ -f "$ORIG_DIR/$1" ] || get_value "$1" > "$ORIG_DIR/$1"
+}
+
+set_ethernet() {
+    local d
+    case "$1" in
+        off)
+            echo "ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"$ETH_VENDOR\", ATTR{idProduct}==\"$ETH_PRODUCT\", ATTR{authorized}=\"0\"" > "$ETH_RULE"
+            for d in $(eth_devices); do echo 0 > "$d/authorized"; done
+            ;;
+        auto)
+            echo "ACTION!=\"remove\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"$ETH_VENDOR\", ATTR{idProduct}==\"$ETH_PRODUCT\", ATTR{power/control}=\"auto\"" > "$ETH_RULE"
+            for d in $(eth_devices); do
+                echo 1 > "$d/authorized"
+                echo auto > "$d/power/control" 2>/dev/null
+            done
+            ;;
+        on)
+            rm -f "$ETH_RULE"
+            for d in $(eth_devices); do
+                echo 1 > "$d/authorized"
+                echo on > "$d/power/control" 2>/dev/null
+            done
+            ;;
+        *) die "ethernet: on|auto|off" ;;
+    esac
+    udevadm control --reload 2>/dev/null
+}
+
+set_wifi() {
+    case "$1" in
+        on|off) nmcli radio wifi "$1" ;;
+        *) die "wifi: on|off" ;;
+    esac
+}
+
+set_rfkill_bluetooth() {
+    local r
+    for r in /sys/class/rfkill/rfkill*; do
+        [ "$(cat "$r/type" 2>/dev/null)" = "bluetooth" ] && echo "$1" > "$r/soft"
+    done
+}
+
+set_bluetooth() {
+    case "$1" in
+        off) systemctl disable --now bluetooth.service; set_rfkill_bluetooth 1 ;;
+        on) set_rfkill_bluetooth 0; systemctl enable --now bluetooth.service ;;
+        *) die "bluetooth: on|off" ;;
+    esac
+}
+
+set_unit() { # set_unit <unit> on|off
+    case "$2" in
+        off) systemctl disable --now "$1" ;;
+        on) systemctl enable --now "$1" ;;
+    esac
+}
+
+set_hdmi_desktop() {
+    case "$1" in
+        on|off) set_unit lightdm.service "$1" ;;
+        *) die "hdmi_desktop: on|off" ;;
+    esac
+}
+
+set_tailscale() {
+    case "$1" in
+        on|off) set_unit tailscaled.service "$1" ;;
+        *) die "tailscale: on|off" ;;
+    esac
+}
+
+set_extra_services() {
+    local u list=$STATE_DIR/extra-services-enabled
+    mkdir -p "$STATE_DIR"
+    case "$1" in
+        off)
+            # Se apuntan los que estaban activos para volver a dejar sólo esos.
+            : > "$list"
+            for u in $EXTRA_UNITS; do
+                if unit_enabled "$u"; then
+                    echo "$u" >> "$list"
+                    systemctl disable --now "$u"
+                fi
+            done
+            ;;
+        on)
+            if [ -s "$list" ]; then
+                while read -r u; do
+                    case " $EXTRA_UNITS " in *" $u "*) systemctl enable --now "$u" ;; esac
+                done < "$list"
+            else
+                for u in $EXTRA_UNITS; do unit_exists "$u" && systemctl enable --now "$u"; done
+            fi
+            rm -f "$list"
+            ;;
+        *) die "extra_services: on|off" ;;
+    esac
+}
+
+set_journal_ram() {
+    case "$1" in
+        on)
+            mkdir -p "$(dirname "$JOURNAL_DROPIN")"
+            printf '# ZeroPower: journal in RAM (fewer SD card writes)\n[Journal]\nStorage=volatile\nRuntimeMaxUse=16M\n' > "$JOURNAL_DROPIN"
+            ;;
+        off) rm -f "$JOURNAL_DROPIN" ;;
+        *) die "journal_ram: on|off" ;;
+    esac
+    systemctl restart systemd-journald
+}
+
+set_gpu_mem() {
+    local cfg
+    case "$1" in
+        16|32|64|128) ;;
+        *) die "gpu_mem: 16|32|64|128" ;;
+    esac
+    cfg=$(config_txt)
+    [ -f "$cfg" ] || die "no config.txt"
+    mkdir -p "$STATE_DIR"
+    [ -f "$STATE_DIR/config.txt.orig" ] || cp -a "$cfg" "$STATE_DIR/config.txt.orig"
+    if grep -qE '^[[:space:]]*gpu_mem=' "$cfg"; then
+        sed -i -E "s/^[[:space:]]*gpu_mem=.*/gpu_mem=$1/" "$cfg"
+    else
+        printf '\n# ZeroPower\n[all]\ngpu_mem=%s\n' "$1" >> "$cfg"
+    fi
+    sync
+}
+
+set_value() {
+    remember_original "$1"
+    case "$1" in
+        ethernet) set_ethernet "$2" ;;
+        wifi) set_wifi "$2" ;;
+        bluetooth) set_bluetooth "$2" ;;
+        hdmi_desktop) set_hdmi_desktop "$2" ;;
+        gpu_mem) set_gpu_mem "$2" ;;
+        tailscale) set_tailscale "$2" ;;
+        extra_services) set_extra_services "$2" ;;
+        journal_ram) set_journal_ram "$2" ;;
+        *) die "unknown setting: $1" ;;
+    esac
+}
+
+restore() {
+    local f k v
+    [ -d "$ORIG_DIR" ] || return 0
+    for f in "$ORIG_DIR"/*; do
+        [ -f "$f" ] || continue
+        k=$(basename "$f")
+        v=$(cat "$f")
+        case "$v" in absent) continue ;; esac
+        case " $KEYS " in *" $k "*) ;; *) continue ;; esac
+        [ "$(get_value "$k")" = "$v" ] || set_value "$k" "$v"
+    done
+    rm -rf "$STATE_DIR"
+}
+
+case "${1:-}" in
+    status) status ;;
+    get) [ $# -eq 2 ] || die "usage: get <setting>"; get_value "$2" ;;
+    set)
+        [ $# -eq 3 ] || die "usage: set <setting> <value>"
+        [ "$(id -u)" -eq 0 ] || die "set needs root"
+        set_value "$2" "$3"
+        echo "$2=$(get_value "$2")"
+        ;;
+    restore)
+        [ "$(id -u)" -eq 0 ] || die "restore needs root"
+        restore
+        ;;
+    *) die "usage: status | get <setting> | set <setting> <value> | restore" ;;
+esac
