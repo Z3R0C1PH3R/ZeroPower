@@ -104,7 +104,8 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   app abierta) y el registro dice por qué despierta (`wake: key / screen turned on`) y qué app
   hay abierta. Probado en el aparato: pantalla encendida a mano → apagada al minuto; tecla →
   encendida. Instalada en cpzero. **Enviada a la tienda: [#675](https://github.com/CardputerZero/packages/pull/675)**
-  (el #572 de la 0.1.2 seguía abierto sin revisar: si se aprueba la 0.1.3, sobra). Nueva opción «Screen timeout» en Power saving (1/2/5/10 min
+  (el #572 de la 0.1.2 seguía abierto sin revisar: si se aprueba la 0.1.3, sobra); CI en verde y
+  el vídeo de la 0.1.1 enlazado en un comentario; espera revisión de un responsable. Nueva opción «Screen timeout» en Power saving (1/2/5/10 min
   o Never; captura `screenshot/saving.png` rehecha). Límite conocido: la tecla que la
   despierta también le llega al lanzador o a la app. Pendiente: avisar en pantalla antes del
   apagado por batería baja (al «apagar», el CM0 se detiene pero la placa sigue con corriente
