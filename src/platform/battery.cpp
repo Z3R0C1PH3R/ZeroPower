@@ -6,6 +6,7 @@
 
 #include "process.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 
@@ -88,6 +89,18 @@ int read_brightness(const std::string& dir) {
         return -1;
     }
     return static_cast<int>(v);
+}
+
+bool write_brightness(const std::string& dir, int value) {
+    if (dir.empty()) {
+        return false;
+    }
+    std::FILE* f = std::fopen((dir + "/brightness").c_str(), "w");
+    if (!f) {
+        return false;
+    }
+    const bool ok = std::fprintf(f, "%d\n", value) > 0;
+    return std::fclose(f) == 0 && ok;
 }
 
 } // namespace platform

@@ -33,6 +33,10 @@ cuánto consume el aparato y **deshacerlo** todo igual de fácil.
     abierta no pausa nada.
   - **Quiet launcher**: el lanzador sin sonido de teclas, siempre.
   - **Low battery off**: apaga ordenadamente al 5, 8, 10 o 15 % (tres lecturas seguidas).
+  - **Screen timeout**: si la pantalla sigue encendida tras 1, 2, 5 (por defecto) o 10 minutos
+    sin tocar una tecla, la apaga el propio servicio; la siguiente tecla la enciende. Es la red
+    de seguridad para cuando el lanzador no la apaga (también dentro de las apps: si ves vídeos
+    largos sin tocar nada, súbelo o ponlo en *Never*).
 
 Cada ajuste se queda puesto en el propio sistema (servicios desactivados, una regla de `udev`,
 `config.txt`, la radio del wifi), así que sobrevive a los reinicios sin que nada tenga que
@@ -120,5 +124,5 @@ el simulador no está el ayudante: la app simula el sistema en memoria.
 
 ## Estado
 
-**0.1.2** (20-nov-2026): sin fichero de sudoers y `zeropowerd` como servicio del sistema con el usuario del aparato (lo exige la tienda). **0.1.1**: los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
+**0.1.3** (22-nov-2026): *Screen timeout*; las apps abiertas ya no se confunden con un `nmcli` terminado del lanzador; el registro dice por qué despierta. **0.1.2** (20-nov-2026): sin fichero de sudoers y `zeropowerd` como servicio del sistema con el usuario del aparato (lo exige la tienda). **0.1.1**: los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
 lee bien el estado del sistema. Falta probar en el aparato cada ajuste y el servicio.

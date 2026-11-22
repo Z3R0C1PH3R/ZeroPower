@@ -58,6 +58,7 @@ std::map<std::string, std::string> PowerControl::read_daemon_values() const {
         {"idle_saver", config.idle_saver ? "on" : "off"},
         {"quiet_launcher", config.quiet_launcher ? "on" : "off"},
         {"low_battery", std::to_string(config.low_battery_percent)},
+        {"screen_timeout", std::to_string(config.screen_timeout_s)},
     };
 }
 

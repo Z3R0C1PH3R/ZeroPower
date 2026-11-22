@@ -41,7 +41,8 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 
 - **`src/model/`** (puro, con `tests/power_model_test.cpp`): `power_settings` (catálogo de
   ajustes con título, ayuda, opciones y quién los aplica; `key=value`; opciones del servicio)
-  y `power_logic` (media del consumo, horas que quedan, `LowBatteryGuard`, `IdleTracker`).
+  y `power_logic` (media del consumo, horas que quedan, `LowBatteryGuard`, `IdleTracker`,
+  `ScreenTimeout`).
 - **Ajustes del sistema**: el sistema es la fuente de verdad. `packaging/zeropower-helper`
   (bash, se instala en `/usr/lib/zeropower/`): `status` sin root; `set <ajuste> <valor>` y
   `restore` con root, por `sudo -n` con el sudo sin contraseña que trae el usuario del aparato
@@ -60,8 +61,10 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   servicio mira el `mtime` cada 3 s). Duerme en `poll()` sobre el teclado (1 s de tope).
   Pantalla apagada = `/sys/class/backlight/backlight/brightness` a 0 durante 5 s → `pactl`
   mueve los flujos del lanzador a un `module-null-sink` y `SIGSTOP` al lanzador (no si tiene
-  hijos: una app abierta). Tecla o brillo > 0 → `SIGCONT` y el audio vuelve. Al pararse lo
-  deja todo como estaba.
+  hijos vivos: una app abierta; los zombis no cuentan). Tecla o brillo > 0 → `SIGCONT` y el
+  audio vuelve. Con la pantalla encendida y `screen_timeout` s sin teclas, el servicio escribe
+  brillo 0 (el usuario está en el grupo `video`) y la tecla siguiente devuelve el que había.
+  Al pararse lo deja todo como estaba (salvo al apagar por batería: no enciende la pantalla).
 - **App**: `SettingsScreen` es la misma lista para los tres grupos (Hardware, Services,
   Power saving); lee y aplica en un hilo (`PowerControl`). `BatteryScreen`: media de 30 s y
   barras del último minuto.
@@ -89,6 +92,22 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 
 ## Estado
 
+- **0.1.3 (22-nov-2026) — *Screen timeout*.** El Cardputer se quedó sin batería: a las 16:14
+  algo lo despertó y durante una hora el lanzador siguió despierto sin que `zeropowerd` lo
+  volviera a pausar (no hay más «screen off» en el registro). Reproducido: si la pantalla se
+  enciende **sin tecla** mientras el salvapantallas del lanzador está activo, el lanzador
+  sigue en su estado `Locked` creyendo que está a oscuras y **no la vuelve a apagar nunca**
+  (su `LockscreenStateModel::poll` no hace nada en `Locked`). Arreglo: `ScreenTimeout`
+  (en `power_logic`) apaga la pantalla tras `screen_timeout` s sin teclas (por defecto 300) y
+  la tecla siguiente le devuelve el brillo; si otro la enciende, deja de ser nuestra. Además
+  `open_app()` ignora hijos zombis (un `nmcli` terminado con el lanzador pausado parecía una
+  app abierta) y el registro dice por qué despierta (`wake: key / screen turned on`) y qué app
+  hay abierta. Probado en el aparato: pantalla encendida a mano → apagada al minuto; tecla →
+  encendida. Instalada en cpzero. Nueva opción «Screen timeout» en Power saving (1/2/5/10 min
+  o Never; captura `screenshot/saving.png` rehecha). Límite conocido: la tecla que la
+  despierta también le llega al lanzador o a la app. Pendiente: avisar en pantalla antes del
+  apagado por batería baja (al «apagar», el CM0 se detiene pero la placa sigue con corriente
+  y parece colgado).
 - **0.1.2 (20-nov-2026) — lo que pide la tienda.** El primer envío (0.1.1, PR #571) lo rechazó
   la validación de rutas: `/etc/sudoers.d/zeropower` y `usr/lib/systemd/user/zeropowerd.service`.
   Fuera el sudoers (se usa el sudo sin contraseña del usuario) y el servicio pasa a ser de

@@ -59,6 +59,10 @@ const std::vector<SettingInfo>& all_settings() {
         {"low_battery", Group::Saving, Applier::Daemon, "Low battery off",
          "Power off cleanly when the battery drops to this level.",
          {{"0", "Never"}, {"5", "5 %"}, {"8", "8 %"}, {"10", "10 %"}, {"15", "15 %"}}, "0"},
+        {"screen_timeout", Group::Saving, Applier::Daemon, "Screen timeout",
+         "Screen off after this long without a key, even inside apps (~150 mA).",
+         {{"0", "Never"}, {"60", "1 min"}, {"120", "2 min"}, {"300", "5 min"}, {"600", "10 min"}},
+         "300"},
     };
     return kSettings;
 }
@@ -139,13 +143,15 @@ DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values
     };
     flag("quiet_launcher", config.quiet_launcher);
     flag("idle_saver", config.idle_saver);
-    const auto it = values.find("low_battery");
-    if (it != values.end()) {
-        const SettingInfo* info = find_setting("low_battery");
-        if (info && option_index(*info, it->second) >= 0) {
-            config.low_battery_percent = std::atoi(it->second.c_str());
+    auto number = [&](const char* key, int& out) {
+        const auto it = values.find(key);
+        const SettingInfo* info = find_setting(key);
+        if (it != values.end() && info && option_index(*info, it->second) >= 0) {
+            out = std::atoi(it->second.c_str());
         }
-    }
+    };
+    number("low_battery", config.low_battery_percent);
+    number("screen_timeout", config.screen_timeout_s);
     return config;
 }
 
@@ -155,6 +161,7 @@ std::string daemon_config_text(const DaemonConfig& config) {
     out << "idle_saver=" << (config.idle_saver ? "on" : "off") << "\n";
     out << "quiet_launcher=" << (config.quiet_launcher ? "on" : "off") << "\n";
     out << "low_battery=" << config.low_battery_percent << "\n";
+    out << "screen_timeout=" << config.screen_timeout_s << "\n";
     return out.str();
 }
 

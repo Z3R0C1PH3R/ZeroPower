@@ -30,5 +30,7 @@ BatteryReading read_battery(const std::string& dir);
 // Brillo de la pantalla (/sys/class/backlight/*/brightness); -1 si no hay.
 std::string find_backlight_dir();
 int read_brightness(const std::string& dir);
+// Escribe el brillo; false si no se puede (hace falta el grupo `video`).
+bool write_brightness(const std::string& dir, int value);
 
 } // namespace platform

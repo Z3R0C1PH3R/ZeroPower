@@ -56,6 +56,9 @@ struct DaemonConfig {
     bool quiet_launcher = false;  // el audio del lanzador siempre aparcado (sin sonido de teclas)
     bool idle_saver = true;       // con la pantalla apagada: lanzador en pausa y su audio aparcado
     int low_battery_percent = 0;  // 0 = no apagar
+    // Segundos sin tocar una tecla con la pantalla encendida para apagarla el propio servicio
+    // (0 = nunca). Es la red de seguridad por si el lanzador o una app la dejan encendida.
+    int screen_timeout_s = 300;
 };
 DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values);
 std::string daemon_config_text(const DaemonConfig& config);

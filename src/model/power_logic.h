@@ -82,4 +82,33 @@ private:
     double dark_since_ = 0.0;
 };
 
+// --- Tiempo de pantalla ---
+
+// Red de seguridad: la pantalla la apaga el lanzador (su salvapantallas), pero si no lo hace
+// (una app abierta, o el lanzador se queda despierto) se quedaría encendida hasta agotar la
+// batería. Con la pantalla encendida y `timeout_s` sin teclas, la apaga el servicio; la
+// siguiente tecla le devuelve el brillo que tenía. Si otro la enciende mientras tanto (una
+// app, el lanzador), deja de ser cosa nuestra y se vuelve a contar desde ahí.
+class ScreenTimeout {
+public:
+    enum class Action { None, TurnOff, TurnOn };
+
+    // `brightness` < 0: no hay pantalla que mirar. `timeout_s` <= 0: desactivado.
+    Action update(double now_s, int brightness, bool key_pressed, double timeout_s);
+    bool forced_off() const {
+        return forced_;
+    }
+    // El brillo que había al apagarla (para TurnOn y para dejarlo como estaba al parar).
+    int saved_brightness() const {
+        return saved_;
+    }
+
+private:
+    bool started_ = false;
+    bool forced_ = false;
+    int saved_ = 0;
+    int last_brightness_ = -1;
+    double last_activity_ = 0.0;
+};
+
 } // namespace power

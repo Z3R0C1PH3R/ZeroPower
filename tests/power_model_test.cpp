@@ -29,7 +29,7 @@ void test_catalog() {
     }
     CHECK(power::find_setting("nope") == nullptr);
     CHECK(power::settings_in(power::Group::Hardware).size() == 5);
-    CHECK(power::settings_in(power::Group::Saving).size() == 3);
+    CHECK(power::settings_in(power::Group::Saving).size() == 4);
 
     const auto* eth = power::find_setting("ethernet");
     CHECK(eth && power::step_option(*eth, "on", 1) == "auto");
@@ -52,6 +52,10 @@ void test_key_values_and_daemon_config() {
 
     auto config = power::daemon_config_from({});
     CHECK(config.idle_saver && !config.quiet_launcher && config.low_battery_percent == 0);
+    CHECK(config.screen_timeout_s == 300);
+    CHECK(power::daemon_config_from({{"screen_timeout", "60"}}).screen_timeout_s == 60);
+    CHECK(power::daemon_config_from({{"screen_timeout", "0"}}).screen_timeout_s == 0);
+    CHECK(power::daemon_config_from({{"screen_timeout", "7"}}).screen_timeout_s == 300); // no es opción
     config = power::daemon_config_from(
         {{"idle_saver", "off"}, {"quiet_launcher", "on"}, {"low_battery", "8"}});
     CHECK(!config.idle_saver && config.quiet_launcher && config.low_battery_percent == 8);
@@ -63,8 +67,10 @@ void test_key_values_and_daemon_config() {
     c.idle_saver = false;
     c.quiet_launcher = true;
     c.low_battery_percent = 10;
+    c.screen_timeout_s = 120;
     const auto back = power::daemon_config_from(power::parse_key_values(power::daemon_config_text(c)));
     CHECK(!back.idle_saver && back.quiet_launcher && back.low_battery_percent == 10);
+    CHECK(back.screen_timeout_s == 120);
 }
 
 void test_battery_math() {
@@ -116,6 +122,48 @@ void test_idle_tracker() {
     CHECK(idle.update(40, 0, false, false) == A::None);
 }
 
+void test_screen_timeout() {
+    using A = power::ScreenTimeout::Action;
+    // El caso del 22-nov-2026: el lanzador despierta y deja la pantalla encendida.
+    power::ScreenTimeout t;
+    CHECK(t.update(0, 100, false, 60) == A::None);
+    CHECK(t.update(59, 100, false, 60) == A::None);
+    CHECK(t.update(60, 100, false, 60) == A::TurnOff);
+    CHECK(t.forced_off() && t.saved_brightness() == 100);
+    CHECK(t.update(61, 0, false, 60) == A::None); // sigue apagada
+    CHECK(t.update(500, 0, false, 60) == A::None);
+    CHECK(t.update(501, 0, true, 60) == A::TurnOn); // tecla: vuelve el brillo
+    CHECK(!t.forced_off());
+    CHECK(t.update(502, 100, false, 60) == A::None);
+    CHECK(t.update(530, 100, true, 60) == A::None); // tecla: vuelve a contar
+    CHECK(t.update(589, 100, false, 60) == A::None);
+    CHECK(t.update(590, 100, false, 60) == A::TurnOff);
+
+    // Si otro la enciende mientras está apagada por nosotros, deja de ser nuestra.
+    CHECK(t.update(600, 70, false, 60) == A::None);
+    CHECK(!t.forced_off());
+    CHECK(t.update(601, 70, true, 60) == A::None); // tecla normal: nada que devolver
+    CHECK(t.update(661, 70, false, 60) == A::TurnOff);
+    CHECK(t.saved_brightness() == 70);
+
+    // Desactivar la opción con la pantalla apagada por nosotros la enciende.
+    CHECK(t.update(662, 0, false, 0) == A::TurnOn);
+    CHECK(t.update(5000, 70, false, 0) == A::None); // desactivado: nunca apaga
+
+    // Pantalla apagada por el lanzador: no se toca; al encenderse se cuenta desde ahí.
+    power::ScreenTimeout u;
+    CHECK(u.update(0, 0, false, 60) == A::None);
+    CHECK(u.update(1000, 0, false, 60) == A::None);
+    CHECK(u.update(1001, 50, false, 60) == A::None); // una app la enciende sola
+    CHECK(u.update(1060, 50, false, 60) == A::None);
+    CHECK(u.update(1061, 50, false, 60) == A::TurnOff);
+
+    // Sin pantalla (brillo -1): nada.
+    power::ScreenTimeout v;
+    CHECK(v.update(0, -1, false, 60) == A::None);
+    CHECK(v.update(1000, -1, false, 60) == A::None);
+}
+
 } // namespace
 
 int main() {
@@ -124,6 +172,7 @@ int main() {
     test_battery_math();
     test_low_battery_guard();
     test_idle_tracker();
+    test_screen_timeout();
     if (failures == 0) {
         std::printf("power_model_test: todo bien\n");
     }

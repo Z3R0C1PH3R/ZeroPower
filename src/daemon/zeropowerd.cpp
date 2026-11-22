@@ -11,6 +11,8 @@
 //   pausa nada (la app seguiría sin pantalla, pero quizá sonando o grabando).
 // - «Quiet launcher»: el audio del lanzador aparcado siempre (sin sonido de teclas).
 // - Batería baja: apaga ordenadamente tras tres lecturas seguidas en el umbral.
+// - Tiempo de pantalla: si la pantalla sigue encendida tras `screen_timeout` sin teclas (el
+//   lanzador no la ha apagado, o hay una app abierta), la apaga él; una tecla la enciende.
 //
 // Las ideas (y las medidas de cuánto ahorra cada una) son de cz-battery-saver
 // (github.com/InstantComet/cz-battery-saver, MIT); el código es propio.
@@ -92,11 +94,31 @@ pid_t find_launcher() {
     return found;
 }
 
-// ¿Tiene el lanzador una app abierta (un hijo)?
-bool has_children(pid_t parent) {
+// ¿Tiene el lanzador una app abierta? Devuelve el nombre del primer hijo vivo, o "".
+// Los zombis no cuentan: el lanzador lanza `nmcli` y compañía de vez en cuando, y si se le
+// pausa justo después, el hijo terminado se queda sin recoger y parecería una app abierta.
+std::string open_app(pid_t parent) {
     const std::string children =
         platform::read_text_file("/proc/" + std::to_string(parent) + "/task/" + std::to_string(parent) + "/children");
-    return children.find_first_of("0123456789") != std::string::npos;
+    std::size_t pos = 0;
+    while ((pos = children.find_first_of("0123456789", pos)) != std::string::npos) {
+        const std::size_t end = children.find_first_not_of("0123456789", pos);
+        const std::string child = children.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+        pos = end;
+        // /proc/<pid>/stat: "pid (comm) S ...": el estado va tras el último ')'.
+        const std::string stat = platform::read_text_file("/proc/" + child + "/stat");
+        const auto open = stat.find('(');
+        const auto close = stat.rfind(')');
+        if (open == std::string::npos || close == std::string::npos || close + 2 >= stat.size()) {
+            continue; // ya no existe
+        }
+        const char state = stat[close + 2];
+        if (state == 'Z' || state == 'X') {
+            continue;
+        }
+        return stat.substr(open + 1, close - open - 1);
+    }
+    return "";
 }
 
 // --- Audio (pactl de PipeWire) ---
@@ -229,6 +251,9 @@ int main() {
     long long config_mtime = -1;
     power::IdleTracker idle(5.0);
     power::LowBatteryGuard low(3);
+    power::ScreenTimeout screen;
+    std::string app_name; // la app abierta desde el lanzador, para el registro
+    bool powering_off = false;
     AudioParker audio;
     pid_t launcher = -1;
     bool launcher_stopped = false;
@@ -284,9 +309,35 @@ int main() {
             ::usleep(1000 * 1000);
         }
 
+        // Tiempo de pantalla: antes que el reposo, para que el lanzador se pause en cuanto
+        // la apagamos y que, al despertar, el brillo ya esté de vuelta.
+        int brightness = platform::read_brightness(backlight_dir);
+        switch (screen.update(now_s(), brightness, key, config.screen_timeout_s)) {
+            case power::ScreenTimeout::Action::TurnOff:
+                if (platform::write_brightness(backlight_dir, 0)) {
+                    say("screen on with no keys for %s s: turning it off",
+                        std::to_string(config.screen_timeout_s));
+                    brightness = 0;
+                } else {
+                    say("screen timeout: cannot write the brightness");
+                }
+                break;
+            case power::ScreenTimeout::Action::TurnOn:
+                platform::write_brightness(backlight_dir, screen.saved_brightness());
+                brightness = screen.saved_brightness();
+                say("key: screen back on");
+                break;
+            case power::ScreenTimeout::Action::None:
+                break;
+        }
+
         // Pantalla apagada.
-        const int brightness = platform::read_brightness(backlight_dir);
-        const bool app_open = launcher > 0 && has_children(launcher);
+        const std::string app = launcher > 0 ? open_app(launcher) : "";
+        if (app != app_name) {
+            say(app.empty() ? "app closed%s" : "app open: %s", app);
+            app_name = app;
+        }
+        const bool app_open = !app.empty();
         const bool idle_enabled = config.idle_saver && launcher > 0 && !app_open && brightness >= 0;
         switch (idle.update(now_s(), brightness, key, idle_enabled)) {
             case power::IdleTracker::Action::Sleep:
@@ -297,6 +348,8 @@ int main() {
                 }
                 break;
             case power::IdleTracker::Action::Wake:
+                // Por qué: si un día se queda despierto sin motivo, que quede en el registro.
+                say(key ? "wake: key%s" : (brightness > 0 ? "wake: screen turned on%s" : "wake: saver disabled or app opened%s"));
                 resume_launcher();
                 if (!config.quiet_launcher) {
                     audio.restore(launcher);
@@ -322,6 +375,7 @@ int main() {
             const auto b = platform::read_battery(battery_dir);
             if (b.present && low.update(b.discharging(), b.capacity, config.low_battery_percent)) {
                 say("battery at %s %%: powering off", std::to_string(b.capacity));
+                powering_off = true;
                 resume_launcher();
                 // Desde un servicio (fuera de la sesión) polkit puede no dejarlo: entonces con
                 // el sudo sin contraseña del usuario del aparato.
@@ -332,7 +386,11 @@ int main() {
         }
     }
 
-    // Al parar el servicio (o desinstalar) no se deja nada a medias.
+    // Al parar el servicio (o desinstalar) no se deja nada a medias. Al apagar por batería
+    // no se enciende la pantalla: el aparato se queda detenido pero con corriente.
+    if (screen.forced_off() && !powering_off) {
+        platform::write_brightness(backlight_dir, screen.saved_brightness());
+    }
     resume_launcher();
     audio.restore(launcher);
     if (kbd >= 0) {

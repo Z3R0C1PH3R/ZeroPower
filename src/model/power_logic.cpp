@@ -87,4 +87,44 @@ IdleTracker::Action IdleTracker::update(double now_s, int brightness, bool key_p
     return Action::None;
 }
 
+ScreenTimeout::Action ScreenTimeout::update(double now_s, int brightness, bool key_pressed,
+                                           double timeout_s) {
+    if (!started_) {
+        started_ = true;
+        last_activity_ = now_s;
+        last_brightness_ = brightness;
+    }
+    // Encenderse la pantalla (de 0 a algo) cuenta como actividad: si no, una app que la
+    // enciende sola tras un rato a oscuras se apagaría al instante.
+    const bool lit_up = brightness > 0 && last_brightness_ == 0;
+    last_brightness_ = brightness;
+
+    if (forced_) {
+        if (key_pressed || timeout_s <= 0) {
+            forced_ = false;
+            last_activity_ = now_s;
+            return Action::TurnOn;
+        }
+        if (brightness > 0) {
+            // La ha encendido otro: ya no es nuestra.
+            forced_ = false;
+            last_activity_ = now_s;
+        }
+        return Action::None;
+    }
+    if (key_pressed || lit_up) {
+        last_activity_ = now_s;
+        return Action::None;
+    }
+    if (timeout_s <= 0 || brightness <= 0) {
+        return Action::None;
+    }
+    if (now_s - last_activity_ >= timeout_s) {
+        forced_ = true;
+        saved_ = brightness;
+        return Action::TurnOff;
+    }
+    return Action::None;
+}
+
 } // namespace power
