@@ -43,6 +43,7 @@ private:
 
     bool handle_key(uint32_t key);
     bool handle_password_key(uint32_t key);
+    void forget_message();
     void start_job(std::function<void()> job);
     void apply_value(const power::SettingInfo& info, const std::string& target);
     void run_apply(const std::string& key, const std::string& target, std::string password_line);
@@ -59,6 +60,7 @@ private:
     platform::PowerControl control_;
 
     int row_ = 0;
+    bool shared_bottom_ = false; // 6 filas: la pista y la línea de estado se turnan
     std::map<std::string, std::string> pending_; // valor elegido y aún sin aplicar
     std::string confirm_key_;                    // segundo ENTER pendiente (acceso remoto)
     std::string applying_key_;                   // el interruptor ya se ve en su nuevo valor

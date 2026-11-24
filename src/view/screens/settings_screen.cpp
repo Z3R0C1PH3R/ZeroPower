@@ -7,9 +7,11 @@
 #include "asset_manager.h"
 #include "theme.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 
 #include <pwd.h>
 #include <unistd.h>
@@ -20,8 +22,9 @@ namespace {
 constexpr int32_t kW = view::kScreenWidth;
 constexpr int32_t kMargin = 6;
 constexpr int32_t kRowH = 17;
-// Con 6 filas, a 17 la pista de dos líneas se montaría con la línea de estado.
-constexpr int32_t kRowHCompact = 15;
+// Con 6 filas no caben las filas, la pista de dos líneas y la línea de estado: las filas
+// encogen un poco y la pista y el estado comparten el sitio (ver `shared_bottom_`).
+constexpr int32_t kRowHCompact = 16;
 constexpr int32_t kTop = 3;
 
 const lv_color_t kWarnColor = lv_color_hex(0xF9A825);
@@ -60,6 +63,15 @@ constexpr std::size_t kMaxDots = 34;
 SettingsScreen::SettingsScreen(viewmodel::BaseViewModel& view_model, app::AssetManager& assets,
                                power::Group group)
     : BaseScreen(view_model, assets), group_(group), settings_(power::settings_in(group)) {
+    // Sin Desk Mode instalado, su ajuste no pinta nada: ni se enseña.
+    std::error_code ec;
+    if (!std::filesystem::exists(power::kDeskModeDir, ec)) {
+        settings_.erase(std::remove_if(settings_.begin(), settings_.end(),
+                                       [](const power::SettingInfo* info) {
+                                           return std::strcmp(info->key, "desktop_unplug") == 0;
+                                       }),
+                        settings_.end());
+    }
     init();
     this->view_model().set_page_handlers(this, [this](uint32_t key) { return handle_key(key); },
                                          [this]() {
@@ -109,12 +121,15 @@ void SettingsScreen::build_content(lv_obj_t* content) {
     const lv_font_t* value_font = assets().load_standard_font(13, app::StandardFontWeight::Regular);
     const lv_font_t* small = assets().load_standard_font(11, app::StandardFontWeight::Regular);
 
-    const int32_t row_h = settings_.size() > 5 ? kRowHCompact : kRowH;
+    const bool compact = settings_.size() > 5;
+    const int32_t row_h = compact ? kRowHCompact : kRowH;
+    const int32_t top = compact ? kTop - 1 : kTop;
+    shared_bottom_ = compact;
     for (int i = 0; i < kMaxRows; ++i) {
         auto* box = lv_obj_create(content);
         lv_obj_remove_style_all(box);
         lv_obj_set_size(box, kW - 2 * kMargin, row_h);
-        lv_obj_set_pos(box, kMargin, kTop + i * row_h);
+        lv_obj_set_pos(box, kMargin, top + i * row_h);
         lv_obj_set_style_radius(box, 3, 0);
         lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
         row_boxes_[i] = box;
@@ -147,7 +162,8 @@ void SettingsScreen::build_content(lv_obj_t* content) {
     lv_label_set_long_mode(hint_, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(hint_, kW - 2 * kMargin - 6);
     // Justo debajo de la última fila (como mucho 5 por grupo).
-    lv_obj_set_pos(hint_, kMargin + 3, kTop + static_cast<int32_t>(settings_.size()) * row_h + 4);
+    lv_obj_set_style_text_line_space(hint_, -2, 0);
+    lv_obj_set_pos(hint_, kMargin + 3, top + static_cast<int32_t>(settings_.size()) * row_h + 1);
 
     status_ = lv_label_create(content);
     lv_obj_set_style_text_font(status_, small ? small : &lv_font_montserrat_12, 0);
@@ -240,12 +256,14 @@ bool SettingsScreen::handle_key(uint32_t key) {
         case 'F':
             row_ = (row_ + n - 1) % n;
             confirm_key_.clear();
+            forget_message();
             break;
         case LV_KEY_DOWN:
         case 'x':
         case 'X':
             row_ = (row_ + 1) % n;
             confirm_key_.clear();
+            forget_message();
             break;
         case LV_KEY_LEFT:
         case 'z':
@@ -348,6 +366,15 @@ void SettingsScreen::run_apply(const std::string& key, const std::string& target
             message_error_ = true;
         }
     });
+}
+
+void SettingsScreen::forget_message() {
+    // Con pista y estado compartiendo sitio, el resultado del último cambio se quita al
+    // moverse, para que se vea la pista de la fila nueva.
+    if (shared_bottom_ && !busy_) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        message_.clear();
+    }
 }
 
 bool SettingsScreen::handle_password_key(uint32_t key) {
@@ -525,6 +552,7 @@ void SettingsScreen::refresh() {
 
     std::string status;
     lv_color_t status_color = colors.text_disabled;
+    bool idle_status = false; // sólo el recordatorio de teclas, nada que contar
     if (!confirm_key_.empty()) {
         status = "Remote access will be lost. Press again to turn off.";
         status_color = kWarnColor;
@@ -540,9 +568,20 @@ void SettingsScreen::refresh() {
         status_color = message_error ? kErrorColor : colors.text_disabled;
     } else {
         status = control_.simulated() ? "Simulated system (no helper)" : "F/X choose   ENTER switch / apply";
+        idle_status = true;
     }
     set_text(status_, status);
     lv_obj_set_style_text_color(status_, status_color, 0);
+    if (shared_bottom_) {
+        // Pista y estado en el mismo sitio: si el estado tiene algo que decir, manda él.
+        if (idle_status) {
+            lv_obj_add_flag(status_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(hint_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(status_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(hint_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 }
 
 void SettingsScreen::timer_cb(lv_timer_t* timer) {
