@@ -31,6 +31,7 @@ void test_catalog() {
     CHECK(power::find_setting("nope") == nullptr);
     CHECK(power::settings_in(power::Group::Hardware).size() == 10);
     CHECK(power::settings_in(power::Group::Saving).size() == 6);
+    CHECK(power::settings_in(power::Group::Services).size() == 7);
 
     const auto* eth = power::find_setting("ethernet");
     CHECK(eth && power::step_option(*eth, "on", 1) == "auto");

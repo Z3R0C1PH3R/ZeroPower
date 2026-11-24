@@ -28,6 +28,19 @@ LED_RULE=/etc/udev/rules.d/70-zeropower-leds.rules
 LEDS=/sys/class/leds
 CPUFREQ=/sys/devices/system/cpu/cpufreq
 EXTRA_UNITS="rpcbind.service rpcbind.socket nfs-blkmap.service avahi-daemon.service avahi-daemon.socket apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_all.timer"
+# Los mismos, de uno en uno (cada servicio con su socket). `extra_services` (todos a la vez)
+# queda de la 0.1.3: se acepta y se deshace al desinstalar, pero ya no sale en `status`.
+SERVICE_KEYS="nfs avahi apt_timers man_db e2scrub"
+
+service_units() {
+    case "$1" in
+        nfs) echo "rpcbind.service rpcbind.socket nfs-blkmap.service" ;;
+        avahi) echo "avahi-daemon.service avahi-daemon.socket" ;;
+        apt_timers) echo "apt-daily.timer apt-daily-upgrade.timer" ;;
+        man_db) echo "man-db.timer" ;;
+        e2scrub) echo "e2scrub_all.timer" ;;
+    esac
+}
 
 die() {
     echo "zeropower-helper: $*" >&2
@@ -109,6 +122,16 @@ get_extra_services() {
     echo off
 }
 
+get_service() { # get_service <ajuste>: on si alguna de sus unidades está habilitada
+    local u found=
+    for u in $(service_units "$1"); do
+        unit_exists "$u" || continue
+        found=1
+        unit_enabled "$u" && { echo on; return; }
+    done
+    [ -n "$found" ] && echo off || echo absent
+}
+
 get_journal_ram() {
     [ -f "$JOURNAL_DROPIN" ] && echo on || echo off
 }
@@ -142,6 +165,7 @@ get_value() {
         tailscale) get_tailscale ;;
         extra_services) get_extra_services ;;
         journal_ram) get_journal_ram ;;
+        nfs|avahi|apt_timers|man_db|e2scrub) get_service "$1" ;;
         cpu_max) get_cpu_max ;;
         status_led) get_status_led ;;
         grove_5v) get_rail grove_5v_out ;;
@@ -150,7 +174,8 @@ get_value() {
     esac
 }
 
-KEYS="ethernet wifi bluetooth hdmi_desktop gpu_mem tailscale extra_services journal_ram cpu_max status_led grove_5v gpio_5v"
+KEYS="ethernet wifi bluetooth hdmi_desktop gpu_mem tailscale $SERVICE_KEYS journal_ram cpu_max status_led grove_5v gpio_5v"
+RESTORE_KEYS="$KEYS extra_services"
 
 status() {
     local k
@@ -267,6 +292,19 @@ set_extra_services() {
     esac
 }
 
+set_service() { # set_service <ajuste> on|off
+    local u units=
+    for u in $(service_units "$1"); do
+        unit_exists "$u" && units="$units $u"
+    done
+    [ -n "$units" ] || die "$1: not installed"
+    case "$2" in
+        off) systemctl disable --now $units ;;
+        on) systemctl enable --now $units ;;
+        *) die "$1: on|off" ;;
+    esac
+}
+
 set_journal_ram() {
     case "$1" in
         on)
@@ -373,6 +411,7 @@ set_value() {
         tailscale) set_tailscale "$2" ;;
         extra_services) set_extra_services "$2" ;;
         journal_ram) set_journal_ram "$2" ;;
+        nfs|avahi|apt_timers|man_db|e2scrub) set_service "$1" "$2" ;;
         cpu_max) set_cpu_max "$2" ;;
         status_led) set_status_led "$2" ;;
         grove_5v) set_rail grove_5v_out "$2" ;;
@@ -389,7 +428,7 @@ restore() {
         k=$(basename "$f")
         v=$(cat "$f")
         case "$v" in absent) continue ;; esac
-        case " $KEYS " in *" $k "*) ;; *) continue ;; esac
+        case " $RESTORE_KEYS " in *" $k "*) ;; *) continue ;; esac
         # Las salidas de 5 V se quedan como estén ahora: sólo se quita su regla (abajo).
         case "$k" in grove_5v|gpio_5v) continue ;; esac
         [ "$(get_value "$k")" = "$v" ] || set_value "$k" "$v"

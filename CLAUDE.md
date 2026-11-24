@@ -61,6 +61,9 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   un *drop-in* de journald). Las salidas de 5 V (`grove_5v_out`, `ext_5v_out`) y el LED `ACT`
   son LEDs en `/sys/class/leds`; `restore` deja las de 5 V como estén y sólo quita su regla.
   `cpu_max` escribe `scaling_max_freq` ya y `arm_freq` en `config.txt` para el arranque.
+  Los servicios van de uno en uno (`SERVICE_KEYS`, cada uno con sus unidades en
+  `service_units`); `extra_services` (todos a la vez, de la 0.1.3) ya no sale en `status`,
+  pero se acepta y `restore` lo deshace (`RESTORE_KEYS`).
 - **`zeropowerd`** (`src/daemon/`): servicio **del sistema** en `/usr/lib/systemd/system/`
   con `User=1000` y `XDG_RUNTIME_DIR=/run/user/1000` (la tienda sólo admite unidades ahí, con
   el nombre del paquete y que no corran como root; una unidad de usuario en

@@ -36,9 +36,15 @@ cuánto consume el aparato y **deshacerlo** todo igual de fácil.
     Al arrancar están apagados; una app para un Cap puede encender el de GPIO por su cuenta.
     Si se encienden aquí, se quedan encendidos también tras reiniciar. Sin nada enchufado
     gastan ~3 mA cada uno.
-- **Services**: **Tailscale** (pide confirmar), **Background extras** (NFS, rpcbind, avahi y
-  los temporizadores de apt y man-db) y **Logs in RAM** (el journal en memoria: menos
-  escrituras en la tarjeta).
+- **Services**, cada uno con su interruptor:
+  - **Tailscale** (pide confirmar).
+  - **NFS client**: `rpcbind` y `nfs-blkmap`, para carpetas compartidas por red.
+  - **Avahi (.local)**: el nombre `equipo.local` en la red; sin él, se entra por la IP.
+  - **Daily apt updates**: los temporizadores `apt-daily` y `apt-daily-upgrade`; `apt` a mano
+    sigue funcionando.
+  - **Man page index**: el temporizador diario de `man-db`.
+  - **Disk scrub timer**: `e2scrub_all`, que sólo revisa volúmenes LVM (la tarjeta no tiene).
+  - **Logs in RAM**: el journal en memoria (menos escrituras en la tarjeta).
 - **Power saving** (lo hace el servicio `zeropowerd`):
   - **Sleep sound card**: con la pantalla apagada, aparca el audio del lanzador para que
     duerman la tarjeta de sonido y el amplificador (~40 mA).
