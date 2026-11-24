@@ -17,7 +17,7 @@ Tools/compilar.sh deb       # dist/ZeroPower_<versión>_rev1_arm64.deb
 Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 ```
 
-- `.cache` es un enlace a `../ZeroTVBGone/.cache` (LVGL y el *sysroot*).
+- `.cache` es un enlace a `~/.local/share/cardputer-zero-sdk` (LVGL y el *sysroot*, uno por máquina para todas las apps Zero; ver `~/Proyectos/CLAUDE.md`). En un clon nuevo: `mkdir -p ~/.local/share/cardputer-zero-sdk && ln -s ~/.local/share/cardputer-zero-sdk .cache`; si está vacío, la primera compilación lo descarga ahí.
 - **Probar sin pantalla**: simulador bajo `Xvfb :99 -screen 0 900x600x24`
   (`SDL_RENDER_DRIVER=software`), teclas con `xdotool key --window`, captura de 320×170 con
   `import -window root -crop 320x170+287+118 +repage`. Sin el ayudante instalado la app simula
