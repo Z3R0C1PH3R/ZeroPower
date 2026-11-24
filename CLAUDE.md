@@ -92,6 +92,8 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 
 ## Estado
 
+- **Probada en el aparato (24-nov-2026):** Bruno la da por buena («zeropower ok»). La 0.1.3 está en la tienda ([#675](https://github.com/CardputerZero/packages/pull/675), fusionado).
+
 - **0.1.3 (22-nov-2026) — *Screen timeout*.** El Cardputer se quedó sin batería: a las 16:14
   algo lo despertó y durante una hora el lanzador siguió despierto sin que `zeropowerd` lo
   volviera a pausar (no hay más «screen off» en el registro). Reproducido: si la pantalla se
@@ -131,6 +133,6 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
     el sudoers (`visudo -c`) y `zeropowerd` (pausa el lanzador con la pantalla apagada; 0,5 %
     de CPU, 3 MB). Con el ayudante se dejaron puestos, a petición de Bruno, **Ethernet
     auto-suspend → off, escritorio HDMI off y Bluetooth off**.
-  - **Sin probar en el aparato**: la app en la pantalla del Cardputer, `gpu_mem` (pide
+  - Entonces sin probar en el aparato (confirmado el 24-nov-2026): la app en la pantalla del Cardputer, `gpu_mem` (pide
     reiniciar), Wi-Fi/Tailscale desde la app, el apagado por batería baja y `restore` al
     desinstalar.
