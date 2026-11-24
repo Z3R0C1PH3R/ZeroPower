@@ -84,7 +84,7 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 ## Versiones y entrega
 
 - Versión en `project(... VERSION x.y.z)` de `CMakeLists.txt` y en `app-builder.json`, a la vez.
-- El `.deb` se copia a `~/Documentos/ZeroPower-<versión>.deb`, sustituyendo al anterior.
+- El `.deb` se copia a `~/Documentos/Software/ZeroPower-<versión>.deb`, sustituyendo al anterior.
 - Commit en `main` con mensaje en español que empieza por la versión, y push.
 - Tienda: `../AppBuilder/czdev publish --deb dist/…` (ver la memoria `cardputer-zero-apps`);
   la primera publicación pide un vídeo en el aparato (**sin metadatos de ubicación**).
