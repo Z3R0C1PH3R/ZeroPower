@@ -114,7 +114,8 @@ hub `1d6b`).
 
 - **0.1.4 (24-nov-2026)**: indicador del interruptor USB en *Battery* (amarillo en Host, verde
   en Slave) y su explicación en la ayuda y el README. Instalada en cpzero y vista en el aparato
-  (en Slave). **Sin probar por Bruno** en Host.
+  (en Slave). **Sin probar por Bruno** en Host. **Enviada a la tienda:
+  [#796](https://github.com/CardputerZero/packages/pull/796).**
 - **Probada en el aparato (24-nov-2026):** Bruno la da por buena («zeropower ok»). La 0.1.3 está en la tienda ([#675](https://github.com/CardputerZero/packages/pull/675), fusionado).
 
 - **0.1.3 (22-nov-2026) — *Screen timeout*.** El Cardputer se quedó sin batería: a las 16:14
