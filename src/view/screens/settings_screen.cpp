@@ -20,6 +20,8 @@ namespace {
 constexpr int32_t kW = view::kScreenWidth;
 constexpr int32_t kMargin = 6;
 constexpr int32_t kRowH = 17;
+// Con 6 filas, a 17 la pista de dos líneas se montaría con la línea de estado.
+constexpr int32_t kRowHCompact = 15;
 constexpr int32_t kTop = 3;
 
 const lv_color_t kWarnColor = lv_color_hex(0xF9A825);
@@ -107,11 +109,12 @@ void SettingsScreen::build_content(lv_obj_t* content) {
     const lv_font_t* value_font = assets().load_standard_font(13, app::StandardFontWeight::Regular);
     const lv_font_t* small = assets().load_standard_font(11, app::StandardFontWeight::Regular);
 
+    const int32_t row_h = settings_.size() > 5 ? kRowHCompact : kRowH;
     for (int i = 0; i < kMaxRows; ++i) {
         auto* box = lv_obj_create(content);
         lv_obj_remove_style_all(box);
-        lv_obj_set_size(box, kW - 2 * kMargin, kRowH);
-        lv_obj_set_pos(box, kMargin, kTop + i * kRowH);
+        lv_obj_set_size(box, kW - 2 * kMargin, row_h);
+        lv_obj_set_pos(box, kMargin, kTop + i * row_h);
         lv_obj_set_style_radius(box, 3, 0);
         lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
         row_boxes_[i] = box;
@@ -144,7 +147,7 @@ void SettingsScreen::build_content(lv_obj_t* content) {
     lv_label_set_long_mode(hint_, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(hint_, kW - 2 * kMargin - 6);
     // Justo debajo de la última fila (como mucho 5 por grupo).
-    lv_obj_set_pos(hint_, kMargin + 3, kTop + static_cast<int32_t>(settings_.size()) * kRowH + 4);
+    lv_obj_set_pos(hint_, kMargin + 3, kTop + static_cast<int32_t>(settings_.size()) * row_h + 4);
 
     status_ = lv_label_create(content);
     lv_obj_set_style_text_font(status_, small ? small : &lv_font_montserrat_12, 0);

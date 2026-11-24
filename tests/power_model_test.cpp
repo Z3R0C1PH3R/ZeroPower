@@ -29,8 +29,8 @@ void test_catalog() {
         CHECK(power::find_setting(info.key) == &info);
     }
     CHECK(power::find_setting("nope") == nullptr);
-    CHECK(power::settings_in(power::Group::Hardware).size() == 5);
-    CHECK(power::settings_in(power::Group::Saving).size() == 4);
+    CHECK(power::settings_in(power::Group::Hardware).size() == 6);
+    CHECK(power::settings_in(power::Group::Saving).size() == 5);
 
     const auto* eth = power::find_setting("ethernet");
     CHECK(eth && power::step_option(*eth, "on", 1) == "auto");
@@ -52,25 +52,34 @@ void test_key_values_and_daemon_config() {
     CHECK(kv.at("gpu_mem") == "16");
 
     auto config = power::daemon_config_from({});
-    CHECK(config.idle_saver && !config.quiet_launcher && config.low_battery_percent == 0);
+    CHECK(config.idle_audio && config.idle_launcher && !config.quiet_launcher && config.low_battery_percent == 0);
+    CHECK(config.idle_delay_s == 5 && config.desktop_unplug_min == 0);
     CHECK(config.screen_timeout_s == 300);
     CHECK(power::daemon_config_from({{"screen_timeout", "60"}}).screen_timeout_s == 60);
     CHECK(power::daemon_config_from({{"screen_timeout", "0"}}).screen_timeout_s == 0);
     CHECK(power::daemon_config_from({{"screen_timeout", "7"}}).screen_timeout_s == 300); // no es opción
     config = power::daemon_config_from(
         {{"idle_saver", "off"}, {"quiet_launcher", "on"}, {"low_battery", "8"}});
-    CHECK(!config.idle_saver && config.quiet_launcher && config.low_battery_percent == 8);
+    CHECK(!config.idle_audio && !config.idle_launcher && config.quiet_launcher && config.low_battery_percent == 8);
+    config = power::daemon_config_from({{"idle_saver", "audio"}, {"idle_delay", "30"}, {"desktop_unplug", "5"}});
+    CHECK(config.idle_audio && !config.idle_launcher && config.idle_delay_s == 30 && config.desktop_unplug_min == 5);
+    config = power::daemon_config_from({{"idle_saver", "launcher"}, {"idle_delay", "7"}});
+    CHECK(!config.idle_audio && config.idle_launcher && config.idle_delay_s == 5);
     // Valores no válidos: se quedan los de por defecto.
     config = power::daemon_config_from({{"idle_saver", "maybe"}, {"low_battery", "50"}});
-    CHECK(config.idle_saver && config.low_battery_percent == 0);
+    CHECK(config.idle_audio && config.idle_launcher && config.low_battery_percent == 0);
     // Ida y vuelta por el texto.
     power::DaemonConfig c;
-    c.idle_saver = false;
+    c.idle_audio = false;
+    c.idle_delay_s = 10;
+    c.desktop_unplug_min = 15;
     c.quiet_launcher = true;
     c.low_battery_percent = 10;
     c.screen_timeout_s = 120;
     const auto back = power::daemon_config_from(power::parse_key_values(power::daemon_config_text(c)));
-    CHECK(!back.idle_saver && back.quiet_launcher && back.low_battery_percent == 10);
+    CHECK(!back.idle_audio && back.idle_launcher && back.quiet_launcher && back.low_battery_percent == 10);
+    CHECK(power::idle_saver_value(back) == "launcher");
+    CHECK(back.idle_delay_s == 10 && back.desktop_unplug_min == 15);
     CHECK(back.screen_timeout_s == 120);
 }
 
@@ -165,6 +174,23 @@ void test_screen_timeout() {
     CHECK(v.update(1000, -1, false, 60) == A::None);
 }
 
+void test_unplug_timer() {
+    power::UnplugTimer u;
+    CHECK(!u.update(0, true, 1));
+    CHECK(!u.update(10, false, 1));  // empieza a contar
+    CHECK(!u.update(69, false, 1));
+    CHECK(u.update(70, false, 1));   // un minuto desconectado
+    CHECK(!u.update(200, false, 1)); // una vez por desconexión
+    CHECK(!u.update(210, true, 1));  // se vuelve a conectar
+    CHECK(!u.update(220, false, 1));
+    CHECK(!u.update(250, true, 1));  // cable flojo: vuelve antes de tiempo
+    CHECK(!u.update(260, false, 1));
+    CHECK(!u.update(300, false, 1));
+    CHECK(u.update(320, false, 1));
+    power::UnplugTimer never;
+    CHECK(!never.update(0, false, 0) && !never.update(100000, false, 0));
+}
+
 void test_sudo_password() {
     using power::SudoOutcome;
     CHECK(power::classify_sudo(0, "ethernet=off\n") == SudoOutcome::Ok);
@@ -208,6 +234,7 @@ int main() {
     test_low_battery_guard();
     test_idle_tracker();
     test_screen_timeout();
+    test_unplug_timer();
     test_sudo_password();
     if (failures == 0) {
         std::printf("power_model_test: todo bien\n");

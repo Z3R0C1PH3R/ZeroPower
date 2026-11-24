@@ -39,6 +39,9 @@ const std::vector<SettingInfo>& all_settings() {
          "Radio and service off. Small saving, frees some RAM.", kOnOff, "on"},
         {"hdmi_desktop", Group::Hardware, Applier::System, "HDMI desktop",
          "Desktop for an HDMI screen (lightdm). Off frees ~25 MB RAM and CPU.", kOnOff, "on"},
+        {"desktop_unplug", Group::Hardware, Applier::Daemon, "Desk Mode unplug",
+         "Close the Desk Mode desktop after HDMI is unplugged this long. Unsaved work is lost.",
+         {{"0", "Keep desktop"}, {"1", "1 min"}, {"5", "5 min"}, {"15", "15 min"}, {"30", "30 min"}}, "0"},
         {"gpu_mem", Group::Hardware, Applier::System, "GPU memory",
          "RAM kept for the GPU firmware. 16 MB is enough for the built-in screen.",
          {{"16", "16 MB"}, {"32", "32 MB"}, {"64", "64 MB"}, {"128", "128 MB"}}, "64", true},
@@ -52,8 +55,11 @@ const std::vector<SettingInfo>& all_settings() {
          "System journal in RAM (16 MB): fewer SD card writes. Lost on reboot.", kOnOff, "off"},
         // --- Power saving (zeropowerd) ---
         {"idle_saver", Group::Saving, Applier::Daemon, "Screen-off saver",
-         "Screen off: pause the launcher and its audio (~70 mA). A key wakes it.", kOnOff,
-         "on"},
+         "Screen off: sleep the sound card (~40 mA) and pause the launcher (~30 mA). A key wakes it.",
+         {{"on", "Both"}, {"audio", "Sound card"}, {"launcher", "Launcher"}, {"off", "Off"}}, "on"},
+        {"idle_delay", Group::Saving, Applier::Daemon, "Saver delay",
+         "How long the screen must be off before the screen-off saver starts.",
+         {{"3", "3 s"}, {"5", "5 s"}, {"10", "10 s"}, {"30", "30 s"}, {"60", "60 s"}}, "5"},
         {"quiet_launcher", Group::Saving, Applier::Daemon, "Quiet launcher",
          "No launcher key sounds, so the audio amp can sleep (~35 mA).", kOnOff, "off"},
         {"low_battery", Group::Saving, Applier::Daemon, "Low battery off",
@@ -142,7 +148,14 @@ DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values
         }
     };
     flag("quiet_launcher", config.quiet_launcher);
-    flag("idle_saver", config.idle_saver);
+    const auto idle = values.find("idle_saver");
+    if (idle != values.end()) {
+        const std::string& v = idle->second;
+        if (v == "on" || v == "audio" || v == "launcher" || v == "off") {
+            config.idle_audio = v == "on" || v == "audio";
+            config.idle_launcher = v == "on" || v == "launcher";
+        }
+    }
     auto number = [&](const char* key, int& out) {
         const auto it = values.find(key);
         const SettingInfo* info = find_setting(key);
@@ -150,18 +163,32 @@ DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values
             out = std::atoi(it->second.c_str());
         }
     };
+    number("idle_delay", config.idle_delay_s);
     number("low_battery", config.low_battery_percent);
     number("screen_timeout", config.screen_timeout_s);
+    number("desktop_unplug", config.desktop_unplug_min);
     return config;
+}
+
+std::string idle_saver_value(const DaemonConfig& config) {
+    if (config.idle_audio && config.idle_launcher) {
+        return "on";
+    }
+    if (config.idle_audio) {
+        return "audio";
+    }
+    return config.idle_launcher ? "launcher" : "off";
 }
 
 std::string daemon_config_text(const DaemonConfig& config) {
     std::ostringstream out;
     out << "# ZeroPower: options for zeropowerd (changed from the app)\n";
-    out << "idle_saver=" << (config.idle_saver ? "on" : "off") << "\n";
+    out << "idle_saver=" << idle_saver_value(config) << "\n";
+    out << "idle_delay=" << config.idle_delay_s << "\n";
     out << "quiet_launcher=" << (config.quiet_launcher ? "on" : "off") << "\n";
     out << "low_battery=" << config.low_battery_percent << "\n";
     out << "screen_timeout=" << config.screen_timeout_s << "\n";
+    out << "desktop_unplug=" << config.desktop_unplug_min << "\n";
     return out.str();
 }
 

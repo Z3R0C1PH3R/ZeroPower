@@ -22,15 +22,20 @@ cuánto consume el aparato y **deshacerlo** todo igual de fácil.
   - **Bluetooth**: radio y servicio.
   - **HDMI desktop**: el escritorio para una pantalla HDMI (`lightdm`); apagado libera RAM y
     CPU. El lanzador no depende de él.
+  - **Desk Mode unplug** (sólo con [Desk Mode](https://github.com/InstantComet/cz-desk-mode)):
+    cierra su escritorio HDMI cuando el HDMI lleva 1, 5, 15 o 30 minutos desconectado (~55 MB
+    de RAM). Lo que no se haya guardado en él se pierde: por defecto, *Keep desktop*.
   - **GPU memory**: la RAM que se reserva para el firmware de la GPU. La pantalla interna es
     un panel SPI que no la usa: con **16 MB** quedan 48 MB más para Linux. Vale tras reiniciar.
 - **Services**: **Tailscale** (pide confirmar), **Background extras** (NFS, rpcbind, avahi y
   los temporizadores de apt y man-db) y **Logs in RAM** (el journal en memoria: menos
   escrituras en la tarjeta).
 - **Power saving** (lo hace el servicio `zeropowerd`):
-  - **Screen-off saver**: con la pantalla apagada, pausa el lanzador y aparca su audio para
-    que duerman la tarjeta de sonido y el amplificador. Una tecla lo despierta. Si hay una app
+  - **Screen-off saver**: con la pantalla apagada, aparca el audio del lanzador para que
+    duerman la tarjeta de sonido y el amplificador (~40 mA) y pausa el lanzador (~30 mA):
+    *Both*, sólo *Sound card*, sólo *Launcher* u *Off*. Una tecla lo despierta. Si hay una app
     abierta no pausa nada.
+  - **Saver delay**: cuánto tiene que llevar apagada la pantalla para lo anterior (3–60 s).
   - **Quiet launcher**: el lanzador sin sonido de teclas, siempre.
   - **Low battery off**: apaga ordenadamente al 5, 8, 10 o 15 % (tres lecturas seguidas).
   - **Screen timeout**: si la pantalla sigue encendida tras 1, 2, 5 (por defecto) o 10 minutos
@@ -54,6 +59,7 @@ volver a aplicarlo. **Al desinstalar ZeroPower, todo lo que cambió vuelve a com
 | | `Z` / `C` en uno de varias opciones | Elegir valor (queda marcado con `•`) |
 | | `ENTER` | Aplicar el valor elegido (sin elegir, pasa al siguiente) |
 | | `Esc` | Descartar lo elegido / volver |
+| Contraseña | letras, `Shift`, `Sym` · `ENTER` · `Esc` | Escribirla · confirmar · no cambiar nada |
 | Battery | `R` | Empezar la media de cero |
 
 ## Cómo funciona

@@ -60,11 +60,15 @@ PowerControl::PowerControl() {
 std::map<std::string, std::string> PowerControl::read_daemon_values() const {
     // Lo que no esté en el fichero vale lo de por defecto de zeropowerd.
     const auto config = power::daemon_config_from(power::parse_key_values(read_text_file(daemon_config_path())));
+    std::error_code ec;
     return {
-        {"idle_saver", config.idle_saver ? "on" : "off"},
+        {"idle_saver", power::idle_saver_value(config)},
+        {"idle_delay", std::to_string(config.idle_delay_s)},
         {"quiet_launcher", config.quiet_launcher ? "on" : "off"},
         {"low_battery", std::to_string(config.low_battery_percent)},
         {"screen_timeout", std::to_string(config.screen_timeout_s)},
+        // Sin Desk Mode no hay escritorio que cerrar: la fila sale como «not installed».
+        {"desktop_unplug", fs::exists(power::kDeskModeDir, ec) ? std::to_string(config.desktop_unplug_min) : "absent"},
     };
 }
 
