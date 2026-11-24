@@ -92,8 +92,10 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 
 ## El interruptor USB (Host/Slave)
 
-Medido el 24-nov-2026 en `cpzero`, desenchufado, con la pantalla encendida y los ajustes de
-ZeroPower puestos (media de un minuto de `current_now`):
+Medido el 24-nov-2026 en `cpzero`, desenchufado, con la **pantalla apagada y el lanzador en
+pausa** por ZeroPower y sus ajustes puestos (media de un minuto de `current_now`). Para saber si
+la pantalla está apagada hay que mirar `brightness` (ZeroPower la apaga poniéndola a 0), no
+`bl_power`, que sigue en 0:
 
 | Interruptor | Consumo | Interrupciones USB/s |
 |---|---|---|
