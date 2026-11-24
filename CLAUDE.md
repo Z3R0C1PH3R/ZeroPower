@@ -90,6 +90,23 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   la primera publicación pide un vídeo en el aparato (**sin metadatos de ubicación**).
   Icono: `Tools/generar_icono.py`.
 
+## El interruptor USB (Host/Slave)
+
+Medido el 24-nov-2026 en `cpzero`, desenchufado, con la pantalla encendida y los ajustes de
+ZeroPower puestos (media de un minuto de `current_now`):
+
+| Interruptor | Consumo | Interrupciones USB/s |
+|---|---|---|
+| Host (hub encendido) | 286 mA | 8028 |
+| Slave (hub desconectado) | 198 mA | 0 |
+
+En Slave se desconecta el hub GL852G y con él el chip Ethernet USB (0fe6:9900), el USB-A, el
+USB-C de salida y el USB de los Cap: el controlador del CM0 se queda sin dispositivos y deja de
+despertar al procesador 8000 veces por segundo. Son 88 mA menos (31 %), unas dos horas y media
+más de batería. La carga funciona igual en las dos posiciones. Por software se sabe la
+posición: en Slave `lsusb` sólo ve el root hub. Idea pendiente: que ZeroPower lo enseñe y
+recomiende Slave si no se usa nada por USB.
+
 ## Estado
 
 - **Probada en el aparato (24-nov-2026):** Bruno la da por buena («zeropower ok»). La 0.1.3 está en la tienda ([#675](https://github.com/CardputerZero/packages/pull/675), fusionado).
