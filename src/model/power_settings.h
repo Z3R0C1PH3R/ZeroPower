@@ -55,7 +55,7 @@ std::map<std::string, std::string> parse_key_values(const std::string& text);
 struct DaemonConfig {
     bool quiet_launcher = false;  // el audio del lanzador siempre aparcado (sin sonido de teclas)
     // Con la pantalla apagada: su audio aparcado (la tarjeta de sonido duerme) y el lanzador
-    // en pausa. En el fichero, idle_saver=on|audio|launcher|off.
+    // en pausa (idle_audio, idle_launcher; antes, los dos juntos en idle_saver).
     bool idle_audio = true;
     bool idle_launcher = true;
     int idle_delay_s = 5;         // segundos con la pantalla apagada antes de lo anterior
@@ -73,7 +73,6 @@ constexpr const char* kDeskModeDir = "/usr/lib/cz-desk-mode";
 constexpr const char* kDeskModeUnit = "cz-desk-mode-desktop.service";
 
 DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values);
-std::string idle_saver_value(const DaemonConfig& config); // on|audio|launcher|off
 std::string daemon_config_text(const DaemonConfig& config);
 
 } // namespace power

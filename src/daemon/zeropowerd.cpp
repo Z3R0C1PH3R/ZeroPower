@@ -7,7 +7,7 @@
 //
 // - Pantalla apagada (brillo 0) durante `idle_delay` s (5 por defecto): pausa el lanzador
 //   (SIGSTOP) y aparca su audio en un sumidero nulo para que el amplificador y la tarjeta de
-//   sonido duerman (las dos cosas, o sólo una, según `idle_saver`). Una tecla o
+//   sonido duerman (cada cosa con su ajuste: `idle_launcher`, `idle_audio`). Una tecla o
 //   la pantalla encendida lo despiertan. Si hay una app abierta desde el lanzador, no se
 //   pausa nada (la app seguiría sin pantalla, pero quizá sonando o grabando).
 // - «Quiet launcher»: el audio del lanzador aparcado siempre (sin sonido de teclas).

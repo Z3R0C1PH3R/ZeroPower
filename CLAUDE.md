@@ -56,8 +56,11 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   instalar sudoers** (ni en `/etc/sudoers.d` ni desde los scripts: busca `/etc/sudoers`), ni
   polkit. Guarda el original de cada ajuste en `/var/lib/zeropower/original/` y `restore`
   (en el `prerm`) lo devuelve. **No hay servicio de root al arrancar** (la tienda rechaza
-  servicios de root): todo queda puesto en el sistema (servicios, regla de udev
-  `70-zeropower-ethernet.rules`, `config.txt`, la radio del wifi, un *drop-in* de journald).
+  servicios de root): todo queda puesto en el sistema (servicios, reglas de udev
+  `70-zeropower-ethernet.rules` y `70-zeropower-leds.rules`, `config.txt`, la radio del wifi,
+  un *drop-in* de journald). Las salidas de 5 V (`grove_5v_out`, `ext_5v_out`) y el LED `ACT`
+  son LEDs en `/sys/class/leds`; `restore` deja las de 5 V como estén y sólo quita su regla.
+  `cpu_max` escribe `scaling_max_freq` ya y `arm_freq` en `config.txt` para el arranque.
 - **`zeropowerd`** (`src/daemon/`): servicio **del sistema** en `/usr/lib/systemd/system/`
   con `User=1000` y `XDG_RUNTIME_DIR=/run/user/1000` (la tienda sólo admite unidades ahí, con
   el nombre del paquete y que no corran como root; una unidad de usuario en
@@ -65,14 +68,17 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   desde un servicio, `sudo -n`.
   Opciones en `~/.config/zeropower/power.conf` (la app lo reescribe con temporal + rename; el
   servicio mira el `mtime` cada 3 s). Duerme en `poll()` sobre el teclado (1 s de tope).
-  Pantalla apagada = `/sys/class/backlight/backlight/brightness` a 0 durante 5 s → `pactl`
-  mueve los flujos del lanzador a un `module-null-sink` y `SIGSTOP` al lanzador (no si tiene
+  Pantalla apagada = `/sys/class/backlight/backlight/brightness` a 0 durante `idle_delay` s →
+  `pactl` mueve los flujos del lanzador a un `module-null-sink` (`idle_audio`) y `SIGSTOP` al
+  lanzador (`idle_launcher`; el antiguo `idle_saver` aún se lee) (no si tiene
   hijos vivos: una app abierta; los zombis no cuentan). Tecla o brillo > 0 → `SIGCONT` y el
   audio vuelve. Con la pantalla encendida y `screen_timeout` s sin teclas, el servicio escribe
   brillo 0 (el usuario está en el grupo `video`) y la tecla siguiente devuelve el que había.
   Al pararse lo deja todo como estaba (salvo al apagar por batería: no enciende la pantalla).
 - **App**: `SettingsScreen` es la misma lista para los tres grupos (Hardware, Services,
-  Power saving); lee y aplica en un hilo (`PowerControl`). `BatteryScreen`: media de 30 s y
+  Power saving): 5 filas a la vista y, con más, se desplaza con una barra a la derecha; la
+  pista añade *Needs restart* a los ajustes con `needs_reboot` (hoy sólo `gpu_mem`). Lee y
+  aplica en un hilo (`PowerControl`). `BatteryScreen`: media de 30 s y
   barras del último minuto.
 - `platform::run_process` lanza sin shell (lista de argumentos).
 

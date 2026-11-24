@@ -29,8 +29,8 @@ void test_catalog() {
         CHECK(power::find_setting(info.key) == &info);
     }
     CHECK(power::find_setting("nope") == nullptr);
-    CHECK(power::settings_in(power::Group::Hardware).size() == 6);
-    CHECK(power::settings_in(power::Group::Saving).size() == 5);
+    CHECK(power::settings_in(power::Group::Hardware).size() == 10);
+    CHECK(power::settings_in(power::Group::Saving).size() == 6);
 
     const auto* eth = power::find_setting("ethernet");
     CHECK(eth && power::step_option(*eth, "on", 1) == "auto");
@@ -61,10 +61,11 @@ void test_key_values_and_daemon_config() {
     config = power::daemon_config_from(
         {{"idle_saver", "off"}, {"quiet_launcher", "on"}, {"low_battery", "8"}});
     CHECK(!config.idle_audio && !config.idle_launcher && config.quiet_launcher && config.low_battery_percent == 8);
-    config = power::daemon_config_from({{"idle_saver", "audio"}, {"idle_delay", "30"}, {"desktop_unplug", "5"}});
+    config = power::daemon_config_from({{"idle_launcher", "off"}, {"idle_delay", "30"}, {"desktop_unplug", "5"}});
     CHECK(config.idle_audio && !config.idle_launcher && config.idle_delay_s == 30 && config.desktop_unplug_min == 5);
-    config = power::daemon_config_from({{"idle_saver", "launcher"}, {"idle_delay", "7"}});
-    CHECK(!config.idle_audio && config.idle_launcher && config.idle_delay_s == 5);
+    // El ajuste de antes (idle_saver) vale, y los nuevos mandan si están.
+    config = power::daemon_config_from({{"idle_saver", "off"}, {"idle_audio", "on"}, {"idle_delay", "7"}});
+    CHECK(config.idle_audio && !config.idle_launcher && config.idle_delay_s == 5);
     // Valores no válidos: se quedan los de por defecto.
     config = power::daemon_config_from({{"idle_saver", "maybe"}, {"low_battery", "50"}});
     CHECK(config.idle_audio && config.idle_launcher && config.low_battery_percent == 0);
@@ -78,7 +79,6 @@ void test_key_values_and_daemon_config() {
     c.screen_timeout_s = 120;
     const auto back = power::daemon_config_from(power::parse_key_values(power::daemon_config_text(c)));
     CHECK(!back.idle_audio && back.idle_launcher && back.quiet_launcher && back.low_battery_percent == 10);
-    CHECK(power::idle_saver_value(back) == "launcher");
     CHECK(back.idle_delay_s == 10 && back.desktop_unplug_min == 15);
     CHECK(back.screen_timeout_s == 120);
 }

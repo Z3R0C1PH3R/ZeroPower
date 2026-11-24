@@ -62,7 +62,8 @@ std::map<std::string, std::string> PowerControl::read_daemon_values() const {
     const auto config = power::daemon_config_from(power::parse_key_values(read_text_file(daemon_config_path())));
     std::error_code ec;
     return {
-        {"idle_saver", power::idle_saver_value(config)},
+        {"idle_audio", config.idle_audio ? "on" : "off"},
+        {"idle_launcher", config.idle_launcher ? "on" : "off"},
         {"idle_delay", std::to_string(config.idle_delay_s)},
         {"quiet_launcher", config.quiet_launcher ? "on" : "off"},
         {"low_battery", std::to_string(config.low_battery_percent)},

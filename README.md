@@ -26,16 +26,25 @@ cuánto consume el aparato y **deshacerlo** todo igual de fácil.
     cierra su escritorio HDMI cuando el HDMI lleva 1, 5, 15 o 30 minutos desconectado (~55 MB
     de RAM). Lo que no se haya guardado en él se pierde: por defecto, *Keep desktop*.
   - **GPU memory**: la RAM que se reserva para el firmware de la GPU. La pantalla interna es
-    un panel SPI que no la usa: con **16 MB** quedan 48 MB más para Linux. Vale tras reiniciar.
+    un panel SPI que no la usa: con **16 MB** quedan 48 MB más para Linux. Vale tras reiniciar
+    (la pista lo dice: *Needs restart*); es el único ajuste que lo necesita.
+  - **CPU max speed**: 1000 (de fábrica), 800 o 600 MHz. Vale ya mismo y tras reiniciar
+    (`arm_freq` en `config.txt`). Las apps van más lentas, pero los ratos de mucho trabajo
+    gastan menos; en reposo, a 600 MHz, sólo ~5 mA.
+  - **Status LED**: el LED verde de actividad del módulo CM0 (~4 mA).
+  - **Grove 5V** y **GPIO 5V**: los 5 V del puerto Grove y de los pines GPIO (para los Caps).
+    Al arrancar están apagados; una app para un Cap puede encender el de GPIO por su cuenta.
+    Si se encienden aquí, se quedan encendidos también tras reiniciar. Sin nada enchufado
+    gastan ~3 mA cada uno.
 - **Services**: **Tailscale** (pide confirmar), **Background extras** (NFS, rpcbind, avahi y
   los temporizadores de apt y man-db) y **Logs in RAM** (el journal en memoria: menos
   escrituras en la tarjeta).
 - **Power saving** (lo hace el servicio `zeropowerd`):
-  - **Screen-off saver**: con la pantalla apagada, aparca el audio del lanzador para que
-    duerman la tarjeta de sonido y el amplificador (~40 mA) y pausa el lanzador (~30 mA):
-    *Both*, sólo *Sound card*, sólo *Launcher* u *Off*. Una tecla lo despierta. Si hay una app
-    abierta no pausa nada.
-  - **Saver delay**: cuánto tiene que llevar apagada la pantalla para lo anterior (3–60 s).
+  - **Sleep sound card**: con la pantalla apagada, aparca el audio del lanzador para que
+    duerman la tarjeta de sonido y el amplificador (~40 mA).
+  - **Pause launcher**: con la pantalla apagada, pausa el lanzador, que no deja de repintar
+    (~30 mA). Una tecla lo despierta. Si hay una app abierta no pausa nada.
+  - **Saver delay**: cuánto tiene que llevar apagada la pantalla para los dos anteriores (3–60 s).
   - **Quiet launcher**: el lanzador sin sonido de teclas, siempre.
   - **Low battery off**: apaga ordenadamente al 5, 8, 10 o 15 % (tres lecturas seguidas).
   - **Screen timeout**: si la pantalla sigue encendida tras 1, 2, 5 (por defecto) o 10 minutos

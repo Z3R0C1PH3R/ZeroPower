@@ -22,9 +22,9 @@ namespace {
 constexpr int32_t kW = view::kScreenWidth;
 constexpr int32_t kMargin = 6;
 constexpr int32_t kRowH = 17;
-// Con 6 filas no caben las filas, la pista de dos líneas y la línea de estado: las filas
-// encogen un poco y la pista y el estado comparten el sitio (ver `shared_bottom_`).
-constexpr int32_t kRowHCompact = 16;
+// Barra de desplazamiento, a la derecha de las filas, cuando no caben todas.
+constexpr int32_t kBarW = 3;
+constexpr int32_t kBarGap = 3;
 constexpr int32_t kTop = 3;
 
 const lv_color_t kWarnColor = lv_color_hex(0xF9A825);
@@ -121,15 +121,15 @@ void SettingsScreen::build_content(lv_obj_t* content) {
     const lv_font_t* value_font = assets().load_standard_font(13, app::StandardFontWeight::Regular);
     const lv_font_t* small = assets().load_standard_font(11, app::StandardFontWeight::Regular);
 
-    const bool compact = settings_.size() > 5;
-    const int32_t row_h = compact ? kRowHCompact : kRowH;
-    const int32_t top = compact ? kTop - 1 : kTop;
-    shared_bottom_ = compact;
+    const int n = static_cast<int>(settings_.size());
+    const int visible = n < kMaxRows ? n : kMaxRows;
+    const bool scrolls = n > kMaxRows;
+    const int32_t row_w = kW - 2 * kMargin - (scrolls ? kBarW + kBarGap : 0);
     for (int i = 0; i < kMaxRows; ++i) {
         auto* box = lv_obj_create(content);
         lv_obj_remove_style_all(box);
-        lv_obj_set_size(box, kW - 2 * kMargin, row_h);
-        lv_obj_set_pos(box, kMargin, top + i * row_h);
+        lv_obj_set_size(box, row_w, kRowH);
+        lv_obj_set_pos(box, kMargin, kTop + i * kRowH);
         lv_obj_set_style_radius(box, 3, 0);
         lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
         row_boxes_[i] = box;
@@ -157,13 +157,30 @@ void SettingsScreen::build_content(lv_obj_t* content) {
         row_switches_[i] = sw;
     }
 
+    if (scrolls) {
+        scroll_track_ = lv_obj_create(content);
+        lv_obj_remove_style_all(scroll_track_);
+        lv_obj_set_size(scroll_track_, kBarW, visible * kRowH);
+        lv_obj_set_pos(scroll_track_, kW - kMargin - kBarW, kTop);
+        lv_obj_set_style_radius(scroll_track_, kBarW / 2 + 1, 0);
+        lv_obj_set_style_bg_opa(scroll_track_, LV_OPA_COVER, 0);
+        lv_obj_remove_flag(scroll_track_, LV_OBJ_FLAG_SCROLLABLE);
+
+        scroll_thumb_ = lv_obj_create(scroll_track_);
+        lv_obj_remove_style_all(scroll_thumb_);
+        lv_obj_set_size(scroll_thumb_, kBarW, visible * kRowH * kMaxRows / n);
+        lv_obj_set_style_radius(scroll_thumb_, kBarW / 2 + 1, 0);
+        lv_obj_set_style_bg_opa(scroll_thumb_, LV_OPA_COVER, 0);
+    }
+
     hint_ = lv_label_create(content);
     lv_obj_set_style_text_font(hint_, small ? small : &lv_font_montserrat_12, 0);
     lv_label_set_long_mode(hint_, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(hint_, kW - 2 * kMargin - 6);
-    // Justo debajo de la última fila (como mucho 5 por grupo).
+    // Justo debajo de la última fila que se ve, con las líneas un poco juntas: con dos líneas
+    // tiene que caber encima de la línea de estado.
     lv_obj_set_style_text_line_space(hint_, -2, 0);
-    lv_obj_set_pos(hint_, kMargin + 3, top + static_cast<int32_t>(settings_.size()) * row_h + 1);
+    lv_obj_set_pos(hint_, kMargin + 3, kTop + visible * kRowH + 1);
 
     status_ = lv_label_create(content);
     lv_obj_set_style_text_font(status_, small ? small : &lv_font_montserrat_12, 0);
@@ -256,14 +273,12 @@ bool SettingsScreen::handle_key(uint32_t key) {
         case 'F':
             row_ = (row_ + n - 1) % n;
             confirm_key_.clear();
-            forget_message();
             break;
         case LV_KEY_DOWN:
         case 'x':
         case 'X':
             row_ = (row_ + 1) % n;
             confirm_key_.clear();
-            forget_message();
             break;
         case LV_KEY_LEFT:
         case 'z':
@@ -358,7 +373,7 @@ void SettingsScreen::run_apply(const std::string& key, const std::string& target
         if (result.ok) {
             message_ = std::string(applied->title) + ": " + power::option_label(*applied, result.value);
             if (applied->needs_reboot) {
-                message_ += " (reboot to apply)";
+                message_ += " (restart to apply)";
             }
             message_error_ = false;
         } else {
@@ -366,15 +381,6 @@ void SettingsScreen::run_apply(const std::string& key, const std::string& target
             message_error_ = true;
         }
     });
-}
-
-void SettingsScreen::forget_message() {
-    // Con pista y estado compartiendo sitio, el resultado del último cambio se quita al
-    // moverse, para que se vea la pista de la fila nueva.
-    if (shared_bottom_ && !busy_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        message_.clear();
-    }
 }
 
 bool SettingsScreen::handle_password_key(uint32_t key) {
@@ -483,13 +489,29 @@ void SettingsScreen::refresh() {
     }
     refresh_password_prompt(colors);
 
+    // Ventana de filas que se ven: la elegida siempre dentro.
+    const int n = static_cast<int>(settings_.size());
+    if (row_ < first_) {
+        first_ = row_;
+    } else if (row_ >= first_ + kMaxRows) {
+        first_ = row_ - kMaxRows + 1;
+    }
+    if (scroll_track_) {
+        lv_obj_set_style_bg_color(scroll_track_, colors.border, 0);
+        lv_obj_set_style_bg_color(scroll_thumb_, colors.text_disabled, 0);
+        const int32_t track_h = lv_obj_get_height(scroll_track_);
+        const int32_t thumb_h = lv_obj_get_height(scroll_thumb_);
+        lv_obj_set_y(scroll_thumb_, (track_h - thumb_h) * first_ / (n - kMaxRows));
+    }
+
     for (int i = 0; i < kMaxRows; ++i) {
-        if (i >= static_cast<int>(settings_.size())) {
+        const int index = first_ + i;
+        if (index >= n) {
             lv_obj_add_flag(row_boxes_[i], LV_OBJ_FLAG_HIDDEN);
             continue;
         }
-        const power::SettingInfo& info = *settings_[static_cast<std::size_t>(i)];
-        const bool selected = i == row_;
+        const power::SettingInfo& info = *settings_[static_cast<std::size_t>(index)];
+        const bool selected = index == row_;
         lv_obj_remove_flag(row_boxes_[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_opa(row_boxes_[i], selected ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
         lv_obj_set_style_bg_color(row_boxes_[i], colors.primary, 0);
@@ -546,13 +568,12 @@ void SettingsScreen::refresh() {
 
     if (!settings_.empty()) {
         const power::SettingInfo& info = *settings_[static_cast<std::size_t>(row_)];
-        set_text(hint_, info.hint);
+        set_text(hint_, info.needs_reboot ? std::string(info.hint) + " Needs restart." : std::string(info.hint));
         lv_obj_set_style_text_color(hint_, colors.text_disabled, 0);
     }
 
     std::string status;
     lv_color_t status_color = colors.text_disabled;
-    bool idle_status = false; // sólo el recordatorio de teclas, nada que contar
     if (!confirm_key_.empty()) {
         status = "Remote access will be lost. Press again to turn off.";
         status_color = kWarnColor;
@@ -568,20 +589,9 @@ void SettingsScreen::refresh() {
         status_color = message_error ? kErrorColor : colors.text_disabled;
     } else {
         status = control_.simulated() ? "Simulated system (no helper)" : "F/X choose   ENTER switch / apply";
-        idle_status = true;
     }
     set_text(status_, status);
     lv_obj_set_style_text_color(status_, status_color, 0);
-    if (shared_bottom_) {
-        // Pista y estado en el mismo sitio: si el estado tiene algo que decir, manda él.
-        if (idle_status) {
-            lv_obj_add_flag(status_, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_remove_flag(hint_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_remove_flag(status_, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(hint_, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
 }
 
 void SettingsScreen::timer_cb(lv_timer_t* timer) {

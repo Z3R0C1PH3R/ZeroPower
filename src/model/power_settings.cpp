@@ -45,6 +45,16 @@ const std::vector<SettingInfo>& all_settings() {
         {"gpu_mem", Group::Hardware, Applier::System, "GPU memory",
          "RAM kept for the GPU firmware. 16 MB is enough for the built-in screen.",
          {{"16", "16 MB"}, {"32", "32 MB"}, {"64", "64 MB"}, {"128", "128 MB"}}, "64", true},
+        {"cpu_max", Group::Hardware, Applier::System, "CPU max speed",
+         "Caps the CPU clock: apps get slower, busy moments draw less. Idle: ~5 mA at 600 MHz.",
+         {{"1000", "1000 MHz"}, {"800", "800 MHz"}, {"600", "600 MHz"}}, "1000"},
+        {"status_led", Group::Hardware, Applier::System, "Status LED",
+         "The green activity LED of the CM0 module (~4 mA).", kOnOff, "on"},
+        {"grove_5v", Group::Hardware, Applier::System, "Grove 5V",
+         "5 V on the Grove port, for sensors and modules. ~3 mA with nothing plugged in.", kOnOff, "off"},
+        {"gpio_5v", Group::Hardware, Applier::System, "GPIO 5V",
+         "5 V on the GPIO header, for Caps (~3 mA with nothing plugged in). Cap apps may turn it on.", kOnOff,
+         "off"},
         // --- Services ---
         {"tailscale", Group::Services, Applier::System, "Tailscale",
          "VPN daemon. Off saves CPU and RAM, but no remote access through it.", kOnOff, "on",
@@ -54,11 +64,13 @@ const std::vector<SettingInfo>& all_settings() {
         {"journal_ram", Group::Services, Applier::System, "Logs in RAM",
          "System journal in RAM (16 MB): fewer SD card writes. Lost on reboot.", kOnOff, "off"},
         // --- Power saving (zeropowerd) ---
-        {"idle_saver", Group::Saving, Applier::Daemon, "Screen-off saver",
-         "Screen off: sleep the sound card (~40 mA) and pause the launcher (~30 mA). A key wakes it.",
-         {{"on", "Both"}, {"audio", "Sound card"}, {"launcher", "Launcher"}, {"off", "Off"}}, "on"},
+        {"idle_audio", Group::Saving, Applier::Daemon, "Sleep sound card",
+         "Screen off: park the launcher's audio so the sound card sleeps (~40 mA).", kOnOff, "on"},
+        {"idle_launcher", Group::Saving, Applier::Daemon, "Pause launcher",
+         "Screen off: pause the launcher, which keeps redrawing (~30 mA). A key wakes it.", kOnOff,
+         "on"},
         {"idle_delay", Group::Saving, Applier::Daemon, "Saver delay",
-         "How long the screen must be off before the screen-off saver starts.",
+         "How long the screen must be off before the two above start.",
          {{"3", "3 s"}, {"5", "5 s"}, {"10", "10 s"}, {"30", "30 s"}, {"60", "60 s"}}, "5"},
         {"quiet_launcher", Group::Saving, Applier::Daemon, "Quiet launcher",
          "No launcher key sounds, so the audio amp can sleep (~35 mA).", kOnOff, "off"},
@@ -148,14 +160,13 @@ DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values
         }
     };
     flag("quiet_launcher", config.quiet_launcher);
+    // Hasta 0.1.3 era un solo ajuste, idle_saver=on|off: vale mientras no estén los nuevos.
     const auto idle = values.find("idle_saver");
-    if (idle != values.end()) {
-        const std::string& v = idle->second;
-        if (v == "on" || v == "audio" || v == "launcher" || v == "off") {
-            config.idle_audio = v == "on" || v == "audio";
-            config.idle_launcher = v == "on" || v == "launcher";
-        }
+    if (idle != values.end() && (idle->second == "on" || idle->second == "off")) {
+        config.idle_audio = config.idle_launcher = idle->second == "on";
     }
+    flag("idle_audio", config.idle_audio);
+    flag("idle_launcher", config.idle_launcher);
     auto number = [&](const char* key, int& out) {
         const auto it = values.find(key);
         const SettingInfo* info = find_setting(key);
@@ -170,20 +181,11 @@ DaemonConfig daemon_config_from(const std::map<std::string, std::string>& values
     return config;
 }
 
-std::string idle_saver_value(const DaemonConfig& config) {
-    if (config.idle_audio && config.idle_launcher) {
-        return "on";
-    }
-    if (config.idle_audio) {
-        return "audio";
-    }
-    return config.idle_launcher ? "launcher" : "off";
-}
-
 std::string daemon_config_text(const DaemonConfig& config) {
     std::ostringstream out;
     out << "# ZeroPower: options for zeropowerd (changed from the app)\n";
-    out << "idle_saver=" << idle_saver_value(config) << "\n";
+    out << "idle_audio=" << (config.idle_audio ? "on" : "off") << "\n";
+    out << "idle_launcher=" << (config.idle_launcher ? "on" : "off") << "\n";
     out << "idle_delay=" << config.idle_delay_s << "\n";
     out << "quiet_launcher=" << (config.quiet_launcher ? "on" : "off") << "\n";
     out << "low_battery=" << config.low_battery_percent << "\n";
