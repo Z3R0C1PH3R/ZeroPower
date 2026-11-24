@@ -62,8 +62,11 @@ volver a aplicarlo. **Al desinstalar ZeroPower, todo lo que cambió vuelve a com
   `/usr/lib/zeropower/zeropower-helper status` (sin root).
 - **Para cambiar algo** llama a `sudo -n /usr/lib/zeropower/zeropower-helper set <ajuste> <valor>`,
   con el `sudo` sin contraseña que el usuario del aparato ya trae de fábrica (lo pone el
-  Raspberry Pi Imager). ZeroPower **no instala ningún fichero de sudoers** ni da permisos
-  nuevos; sin sudo sin contraseña, la app avisa y no cambia nada. El ayudante es un script de
+  Raspberry Pi Imager). Si tu usuario necesita contraseña para sudo, la app la pide en
+  pantalla y repite el cambio con `sudo -S`: la contraseña va por la entrada estándar (nunca
+  en la línea de órdenes), no se guarda y se borra de la memoria al acabar; sudo la recuerda
+  unos minutos, como en un terminal. ZeroPower **no instala ningún fichero de sudoers** ni da
+  permisos nuevos; un usuario sin sudo no puede cambiar nada. El ayudante es un script de
   bash corto que acepta una lista cerrada de ajustes y valores; la primera vez que cambia
   algo guarda su valor original en `/var/lib/zeropower/original/` para poder devolverlo
   (`zeropower-helper restore`, que se ejecuta al desinstalar).

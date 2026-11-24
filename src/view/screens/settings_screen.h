@@ -7,6 +7,8 @@
 #include "base_screen.h"
 #include "power_control.h"
 #include "power_settings.h"
+#include "sudo_password.h"
+#include "theme.h"
 
 #include <array>
 #include <atomic>
@@ -24,6 +26,9 @@ namespace screen {
  * interruptor (como en iOS) que ENTER, Z o C cambian y aplican al momento; los de varias
  * opciones se eligen con Z/C (queda pendiente, marcado) y ENTER los aplica. Leer el estado y aplicar se hace en otro hilo: el
  * ayudante tarda unas décimas y la pantalla no se queda congelada.
+ *
+ * Si sudo pide contraseña, se pide encima de la lista y el cambio se repite con ella. Sudo
+ * la recuerda unos minutos: los cambios siguientes ya no la piden.
  */
 class SettingsScreen : public BaseScreen {
 public:
@@ -37,9 +42,14 @@ private:
     static constexpr int kMaxRows = 6;
 
     bool handle_key(uint32_t key);
+    bool handle_password_key(uint32_t key);
     void start_job(std::function<void()> job);
     void apply_value(const power::SettingInfo& info, const std::string& target);
+    void run_apply(const std::string& key, const std::string& target, std::string password_line);
+    void open_password_prompt(bool wrong);
+    void close_password_prompt();
     void refresh();
+    void refresh_password_prompt(const view::ThemePalette& colors);
 
     static void timer_cb(lv_timer_t* timer);
     static void theme_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
@@ -60,8 +70,27 @@ private:
     bool loaded_ = false;
     std::string message_;
     bool message_error_ = false;
+    bool password_wanted_ = false; // el último cambio necesita contraseña
+    bool password_wrong_ = false;  // ... porque la que se dio no valía
+    std::string password_key_;     // el cambio que hay que repetir con ella
+    std::string password_value_;
     std::atomic<bool> busy_{false};
     std::thread worker_;
+
+    // La pantalla de la contraseña (sólo en el hilo de LVGL).
+    power::SecretInput password_;
+    bool prompt_open_ = false;
+    bool prompt_checking_ = false; // sudo la está comprobando
+    bool prompt_wrong_ = false;
+    std::string prompt_key_;
+    std::string prompt_value_;
+    lv_obj_t* prompt_ = nullptr;
+    lv_obj_t* prompt_title_ = nullptr;
+    lv_obj_t* prompt_text_ = nullptr;
+    lv_obj_t* prompt_field_ = nullptr;
+    lv_obj_t* prompt_dots_ = nullptr;
+    lv_obj_t* prompt_error_ = nullptr;
+    lv_obj_t* prompt_footer_ = nullptr;
 
     std::array<lv_obj_t*, kMaxRows> row_boxes_{};
     std::array<lv_obj_t*, kMaxRows> row_titles_{};

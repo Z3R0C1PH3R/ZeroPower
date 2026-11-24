@@ -4,6 +4,7 @@
 
 #include "power_logic.h"
 #include "power_settings.h"
+#include "sudo_password.h"
 
 #include <cmath>
 #include <cstdio>
@@ -164,6 +165,40 @@ void test_screen_timeout() {
     CHECK(v.update(1000, -1, false, 60) == A::None);
 }
 
+void test_sudo_password() {
+    using power::SudoOutcome;
+    CHECK(power::classify_sudo(0, "ethernet=off\n") == SudoOutcome::Ok);
+    CHECK(power::classify_sudo(1, "sudo: a password is required\n") == SudoOutcome::NeedsPassword);
+    CHECK(power::classify_sudo(1, "Sorry, try again.\nsudo: no password was provided\n"
+                                  "sudo: 1 incorrect password attempt\n") == SudoOutcome::WrongPassword);
+    CHECK(power::classify_sudo(1, "sudo: no password was provided\n") == SudoOutcome::NeedsPassword);
+    CHECK(power::classify_sudo(1, "pi is not in the sudoers file.\n") == SudoOutcome::NotAllowed);
+    CHECK(power::classify_sudo(1, "Sorry, user pi is not allowed to execute '/usr/lib/zeropower/zeropower-helper "
+                                  "set ethernet off' as root on cpz.\n") == SudoOutcome::NotAllowed);
+    CHECK(power::classify_sudo(2, "invalid value\n") == SudoOutcome::Failed);
+
+    power::SecretInput in;
+    CHECK(in.empty() && in.masked().empty());
+    CHECK(in.add('p') && in.add('W') && in.add('!') && in.add(' '));
+    CHECK(!in.add('\n') && !in.add(0x7F) && !in.add(0xE9)); // control y no ASCII: fuera
+    CHECK(in.size() == 4);
+    CHECK(in.masked() == "\u2022\u2022\u2022\u2022");
+    CHECK(in.masked(2) == "\u2026\u2022\u2022");
+    CHECK(in.backspace() && in.size() == 3);
+    std::string line = in.take_line();
+    CHECK(line == "pW!\n");
+    CHECK(in.empty() && !in.backspace());
+    power::wipe(line);
+    CHECK(line.empty());
+
+    for (std::size_t i = 0; i < power::SecretInput::kMaxLength; ++i) {
+        CHECK(in.add('a'));
+    }
+    CHECK(!in.add('a'));
+    in.clear();
+    CHECK(in.empty());
+}
+
 } // namespace
 
 int main() {
@@ -173,6 +208,7 @@ int main() {
     test_low_battery_guard();
     test_idle_tracker();
     test_screen_timeout();
+    test_sudo_password();
     if (failures == 0) {
         std::printf("power_model_test: todo bien\n");
     }

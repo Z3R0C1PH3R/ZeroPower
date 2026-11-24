@@ -46,7 +46,13 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 - **Ajustes del sistema**: el sistema es la fuente de verdad. `packaging/zeropower-helper`
   (bash, se instala en `/usr/lib/zeropower/`): `status` sin root; `set <ajuste> <valor>` y
   `restore` con root, por `sudo -n` con el sudo sin contraseña que trae el usuario del aparato
-  (`bruno ALL=(ALL) NOPASSWD:ALL` en `90-cloud-init-users`, del Imager). **La tienda no deja
+  (`bruno ALL=(ALL) NOPASSWD:ALL` en `90-cloud-init-users`, del Imager). Si sudo pide
+  contraseña (`classify_sudo` en `src/model/sudo_password.h`), `SettingsScreen` la pide encima
+  de la lista y `PowerControl::apply` repite con `sudo -S -p ""`, pasándola por la entrada
+  estándar de `run_process` y borrándola al acabar (`SecretInput`, `wipe`). En el simulador se
+  prueba con `ZEROPOWER_SIMULATE_SUDO=<clave>`. Para teclearla, `linux_input` entiende Shift
+  y la capa Sym del Cardputer (lee `/usr/share/keymaps/tca8418_keypad_m5stack_keymap.map`), y
+  la T no cambia el tema mientras se escribe (`set_text_entry`). **La tienda no deja
   instalar sudoers** (ni en `/etc/sudoers.d` ni desde los scripts: busca `/etc/sudoers`), ni
   polkit. Guarda el original de cada ajuste en `/var/lib/zeropower/original/` y `restore`
   (en el `prerm`) lo devuelve. **No hay servicio de root al arrancar** (la tienda rechaza
