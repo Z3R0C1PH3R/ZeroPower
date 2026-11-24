@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 
 namespace platform {
 namespace {
@@ -101,6 +102,23 @@ bool write_brightness(const std::string& dir, int value) {
     }
     const bool ok = std::fprintf(f, "%d\n", value) > 0;
     return std::fclose(f) == 0 && ok;
+}
+
+bool read_usb_vendors(std::vector<std::string>& vendors) {
+    vendors.clear();
+    std::error_code error;
+    const std::filesystem::path root("/sys/bus/usb/devices");
+    if (!std::filesystem::is_directory(root, error)) {
+        return false;
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
+        std::ifstream file(entry.path() / "idVendor");
+        std::string vendor;
+        if (file >> vendor) {
+            vendors.push_back(vendor);
+        }
+    }
+    return true;
 }
 
 } // namespace platform

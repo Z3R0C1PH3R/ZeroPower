@@ -106,11 +106,15 @@ En Slave se desconecta el hub GL852G y con él el chip Ethernet USB (0fe6:9900),
 USB-C de salida y el USB de los Cap: el controlador del CM0 se queda sin dispositivos y deja de
 despertar al procesador 8000 veces por segundo. Son 88 mA menos (31 %), unas dos horas y media
 más de batería. La carga funciona igual en las dos posiciones. Por software se sabe la
-posición: en Slave `lsusb` sólo ve el root hub. Idea pendiente: que ZeroPower lo enseñe y
-recomiende Slave si no se usa nada por USB.
+posición: en Slave `lsusb` sólo ve el root hub. Desde la 0.1.4 la pantalla *Battery* lo
+enseña (`power::usb_switch_state`: Host si en `/sys/bus/usb/devices` hay algo que no sea un root
+hub `1d6b`).
 
 ## Estado
 
+- **0.1.4 (24-nov-2026)**: indicador del interruptor USB en *Battery* (amarillo en Host, verde
+  en Slave) y su explicación en la ayuda y el README. Instalada en cpzero y vista en el aparato
+  (en Slave). **Sin probar por Bruno** en Host.
 - **Probada en el aparato (24-nov-2026):** Bruno la da por buena («zeropower ok»). La 0.1.3 está en la tienda ([#675](https://github.com/CardputerZero/packages/pull/675), fusionado).
 
 - **0.1.3 (22-nov-2026) — *Screen timeout*.** El Cardputer se quedó sin batería: a las 16:14

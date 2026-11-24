@@ -14,7 +14,9 @@ cuánto consume el aparato y **deshacerlo** todo igual de fácil.
 
 - **Battery**: el consumo de ahora (media de los últimos 30 s, del medidor de la batería
   bq27220), la carga, el voltaje y el tiempo que queda a ese ritmo, con el último minuto en
-  barras. `R` empieza la media de cero: así se ve lo que ahorra cada ajuste.
+  barras. `R` empieza la media de cero: así se ve lo que ahorra cada ajuste. Debajo, **en qué
+  posición está el interruptor USB** del lateral (ver más abajo): en amarillo si está en
+  *Host*, que gasta más; en verde si está en *Slave*.
 - **Hardware**:
   - **USB Ethernet**: *On*, *Auto-suspend* (el chip duerme si no hay cable: ~100 mA menos) u
     *Off* (desactivado).
@@ -41,6 +43,22 @@ cuánto consume el aparato y **deshacerlo** todo igual de fácil.
 Cada ajuste se queda puesto en el propio sistema (servicios desactivados, una regla de `udev`,
 `config.txt`, la radio del wifi), así que sobrevive a los reinicios sin que nada tenga que
 volver a aplicarlo. **Al desinstalar ZeroPower, todo lo que cambió vuelve a como estaba.**
+
+## El interruptor USB del lateral
+
+El interruptor del lateral izquierdo (*Host* / *Slave*) no se puede mover por software, pero
+cuenta mucho: en **Host** está encendido el hub USB interno, y con él el chip de red por cable,
+el USB-A, el USB-C de salida y el USB de los Cap; en **Slave** el hub se desconecta y el
+procesador deja de despertarse 8000 veces por segundo para atenderlo.
+
+| Interruptor | Consumo (pantalla apagada, con ZeroPower) |
+|---|---|
+| Host | 286 mA |
+| Slave | **198 mA** (−88 mA, −31 %: unas dos horas y media más) |
+
+Si no usas nada por USB (pinchos, ratón, un receptor de radio, la red por cable), déjalo en
+**Slave**. El Wi-Fi, el Bluetooth, la carga y los Cap que van por los pines del bus (SPI, I²C,
+UART: LoRa, GPS, CC1101, NFC…) funcionan igual. ZeroPower lo enseña en la pantalla *Battery*.
 
 ## Teclas
 
@@ -124,5 +142,5 @@ el simulador no está el ayudante: la app simula el sistema en memoria.
 
 ## Estado
 
-**0.1.3** (22-nov-2026): *Screen timeout*; las apps abiertas ya no se confunden con un `nmcli` terminado del lanzador; el registro dice por qué despierta. **0.1.2** (20-nov-2026): sin fichero de sudoers y `zeropowerd` como servicio del sistema con el usuario del aparato (lo exige la tienda). **0.1.1**: los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
+**0.1.4** (24-nov-2026): la pantalla *Battery* dice en qué posición está el interruptor USB y lo que ahorra *Slave* (medido: 88 mA). **0.1.3** (22-nov-2026): *Screen timeout*; las apps abiertas ya no se confunden con un `nmcli` terminado del lanzador; el registro dice por qué despierta. **0.1.2** (20-nov-2026): sin fichero de sudoers y `zeropowerd` como servicio del sistema con el usuario del aparato (lo exige la tienda). **0.1.1**: los ajustes de sí/no son interruptores, como en iOS. **0.1.0**: primera versión. Probada en el simulador; en el aparato, el ayudante
 lee bien el estado del sistema. Falta probar en el aparato cada ajuste y el servicio.

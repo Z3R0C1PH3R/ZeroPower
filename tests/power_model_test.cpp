@@ -166,6 +166,15 @@ void test_screen_timeout() {
 
 } // namespace
 
+void test_usb_switch() {
+    using power::UsbSwitch;
+    // Lo que se ve en el Cardputer Zero: root hub (1d6b), hub Genesys (05e3), Ethernet (0fe6).
+    CHECK(power::usb_switch_state(true, {"1d6b", "05e3", "0fe6"}) == UsbSwitch::Host);
+    CHECK(power::usb_switch_state(true, {"1d6b"}) == UsbSwitch::Slave);
+    CHECK(power::usb_switch_state(true, {}) == UsbSwitch::Slave);
+    CHECK(power::usb_switch_state(false, {"05e3"}) == UsbSwitch::Unknown);
+}
+
 int main() {
     test_catalog();
     test_key_values_and_daemon_config();
@@ -173,6 +182,7 @@ int main() {
     test_low_battery_guard();
     test_idle_tracker();
     test_screen_timeout();
+    test_usb_switch();
     if (failures == 0) {
         std::printf("power_model_test: todo bien\n");
     }

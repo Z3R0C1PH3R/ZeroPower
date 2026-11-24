@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <deque>
 #include <string>
+#include <vector>
 
 namespace power {
 
@@ -110,5 +111,20 @@ private:
     int last_brightness_ = -1;
     double last_activity_ = 0.0;
 };
+
+/**
+ * Posición del interruptor USB del lateral (Host/Slave). En Host está encendido el hub USB
+ * interno (y con él el chip Ethernet, el USB-A, el USB-C de salida y el USB de los Cap); en
+ * Slave el hub se desconecta y el controlador del CM0 se queda sin nada que atender: gasta
+ * unos 90 mA menos (medido: 286 → 198 mA con la pantalla apagada). No hay un GPIO que lo diga,
+ * pero se nota en el bus: en Host hay al menos un aparato que no es un root hub.
+ */
+enum class UsbSwitch { Unknown, Host, Slave };
+
+/**
+ * `vendors`: idVendor de cada aparato de /sys/bus/usb/devices (los root hubs son 1d6b).
+ * `bus_present`: si hay bus USB (en el simulador o en otro aparato puede no haberlo).
+ */
+UsbSwitch usb_switch_state(bool bus_present, const std::vector<std::string>& vendors);
 
 } // namespace power

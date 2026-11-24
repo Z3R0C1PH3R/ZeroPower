@@ -29,8 +29,9 @@ constexpr std::array<HelpRow, 4> kHomeRows = {{
     {"HOLD ESC", "Exit"},
 }};
 
-constexpr std::array<HelpRow, 3> kBatteryRows = {{
+constexpr std::array<HelpRow, 4> kBatteryRows = {{
     {"Big number", "Average draw, last 30 s"},
+    {"USB switch", "Slave: hub off, ~90 mA less"},
     {"R", "Restart the average"},
     {"ESC", "Back"},
 }};
