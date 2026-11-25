@@ -53,7 +53,7 @@ const std::vector<SettingInfo>& all_settings() {
         {"grove_5v", Group::Hardware, Applier::System, "Grove 5V",
          "5 V on the Grove port, for sensors and modules. ~3 mA with nothing plugged in.", kOnOff, "off"},
         {"gpio_5v", Group::Hardware, Applier::System, "GPIO 5V",
-         "5 V on the GPIO header, for Caps (~3 mA with nothing plugged in). Cap apps may turn it on.", kOnOff,
+         "5 V on the GPIO header for Caps (~3 mA idle). Off cuts power to a plugged-in Cap.", kOnOff,
          "off"},
         // --- Services ---
         {"tailscale", Group::Services, Applier::System, "Tailscale",

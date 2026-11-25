@@ -391,7 +391,11 @@ set_cpu_max() {
     [ -f "$cfg" ] || die "no config.txt"
     mkdir -p "$STATE_DIR"
     [ -f "$STATE_DIR/config.txt.orig" ] || cp -a "$cfg" "$STATE_DIR/config.txt.orig"
-    # 1000 MHz es lo de fábrica: sin línea que cambiar no hace falta añadirla.
+    # 1000 MHz es lo de fábrica: se quita el bloque que añadió ZeroPower (si lo hay) y, sin
+    # línea que cambiar, no hace falta añadirla.
+    if [ "$1" = 1000 ]; then
+        sed -i -E '/^# ZeroPower$/{N;N;/\n\[all\]\narm_freq=[0-9]+$/d}' "$cfg"
+    fi
     if grep -qE '^[[:space:]]*arm_freq=' "$cfg"; then
         sed -i -E "s/^[[:space:]]*arm_freq=.*/arm_freq=$1/" "$cfg"
     elif [ "$1" != 1000 ]; then
