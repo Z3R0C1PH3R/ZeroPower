@@ -75,7 +75,8 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 - Pantalla interna: panel SPI `panel-mipi-dbi` (`card1-SPI-1`), 320×170 RGB565: no usa la
   GPU. `gpu_mem=64` de fábrica; 16 basta para la pantalla, pero con 16 el firmware es el
   recortado (`start_cd`) y no hay decodificador de vídeo por hardware: ZeroGallery (0.6.1) lo usa
-  para mandar vídeo al HDMI si está. Bruno lo prefiere y `cpzero` volvió a 64 el 25-nov-2026
+  para mandar vídeo al HDMI si está, y **necesita 64**: con 32 el decodificador aparece pero el
+  firmware no puede crearlo («Not enough GPU mem?», probado el 25-nov-2026). Bruno lo prefiere y `cpzero` volvió a 64 el 25-nov-2026
   (puesto desde la propia app y reiniciado).
 - Ethernet USB interno: `0fe6:9900` (SR9900A) en `1-1.1`, detrás de un hub Genesys.
 - Bluetooth por UART (`hci0`); la radio ya venía bloqueada por rfkill.
