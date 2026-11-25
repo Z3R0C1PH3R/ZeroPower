@@ -88,7 +88,11 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
 ## Hardware y medidas (cpzero, 20-nov-2026)
 
 - Pantalla interna: panel SPI `panel-mipi-dbi` (`card1-SPI-1`), 320×170 RGB565: no usa la
-  GPU. `gpu_mem=64` de fábrica; 16 basta (ZeroGallery decodifica vídeo por software).
+  GPU. `gpu_mem=64` de fábrica; 16 basta para la pantalla, pero con 16 el firmware es el
+  recortado (`start_cd`) y no hay decodificador de vídeo por hardware: ZeroGallery (0.6.1) lo usa
+  para mandar vídeo al HDMI si está, y **necesita 64**: con 32 el decodificador aparece pero el
+  firmware no puede crearlo («Not enough GPU mem?», probado el 25-nov-2026). Bruno lo prefiere y `cpzero` volvió a 64 el 25-nov-2026
+  (puesto desde la propia app y reiniciado).
 - Ethernet USB interno: `0fe6:9900` (SR9900A) en `1-1.1`, detrás de un hub Genesys.
 - Bluetooth por UART (`hci0`); la radio ya venía bloqueada por rfkill.
 - Consumo en reposo, desenchufado: **378 mA** con pantalla y lanzador (brillo 100 %, wifi);
@@ -105,8 +109,32 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
   la primera publicación pide un vídeo en el aparato (**sin metadatos de ubicación**).
   Icono: `Tools/generar_icono.py`.
 
+## El interruptor USB (Host/Slave)
+
+Medido el 24-nov-2026 en `cpzero`, desenchufado, con la **pantalla apagada y el lanzador en
+pausa** por ZeroPower y sus ajustes puestos (media de un minuto de `current_now`). Para saber si
+la pantalla está apagada hay que mirar `brightness` (ZeroPower la apaga poniéndola a 0), no
+`bl_power`, que sigue en 0:
+
+| Interruptor | Consumo | Interrupciones USB/s |
+|---|---|---|
+| Host (hub encendido) | 286 mA | 8028 |
+| Slave (hub desconectado) | 198 mA | 0 |
+
+En Slave se desconecta el hub GL852G y con él el chip Ethernet USB (0fe6:9900), el USB-A, el
+USB-C de salida y el USB de los Cap: el controlador del CM0 se queda sin dispositivos y deja de
+despertar al procesador 8000 veces por segundo. Son 88 mA menos (31 %), unas dos horas y media
+más de batería. La carga funciona igual en las dos posiciones. Por software se sabe la
+posición: en Slave `lsusb` sólo ve el root hub. Desde la 0.1.4 la pantalla *Battery* lo
+enseña (`power::usb_switch_state`: Host si en `/sys/bus/usb/devices` hay algo que no sea un root
+hub `1d6b`).
+
 ## Estado
 
+- **0.1.4 (24-nov-2026)**: indicador del interruptor USB en *Battery* (amarillo en Host, verde
+  en Slave) y su explicación en la ayuda y el README. Instalada en cpzero y vista en el aparato
+  (en Slave). Bruno la da por buena (25-nov-2026: «zero power está ok»). **Enviada a la tienda:
+  [#796](https://github.com/CardputerZero/packages/pull/796).**
 - **Probada en el aparato (24-nov-2026):** Bruno la da por buena («zeropower ok»). La 0.1.3 está en la tienda ([#675](https://github.com/CardputerZero/packages/pull/675), fusionado).
 
 - **0.1.3 (22-nov-2026) — *Screen timeout*.** El Cardputer se quedó sin batería: a las 16:14
@@ -148,6 +176,6 @@ Tools/compilar.sh simulador # abre el simulador en este escritorio (X11)
     el sudoers (`visudo -c`) y `zeropowerd` (pausa el lanzador con la pantalla apagada; 0,5 %
     de CPU, 3 MB). Con el ayudante se dejaron puestos, a petición de Bruno, **Ethernet
     auto-suspend → off, escritorio HDMI off y Bluetooth off**.
-  - Entonces sin probar en el aparato (confirmado el 24-nov-2026): la app en la pantalla del Cardputer, `gpu_mem` (pide
+  - Entonces sin probar en el aparato (Bruno lo da todo por bueno el 25-nov-2026): la app en la pantalla del Cardputer, `gpu_mem` (pide
     reiniciar), Wi-Fi/Tailscale desde la app, el apagado por batería baja y `restore` al
     desinstalar.

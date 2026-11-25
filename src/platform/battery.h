@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace platform {
 
@@ -32,5 +33,8 @@ std::string find_backlight_dir();
 int read_brightness(const std::string& dir);
 // Escribe el brillo; false si no se puede (hace falta el grupo `video`).
 bool write_brightness(const std::string& dir, int value);
+
+// idVendor de cada aparato USB (/sys/bus/usb/devices/*/idVendor). false si no hay bus USB.
+bool read_usb_vendors(std::vector<std::string>& vendors);
 
 } // namespace platform

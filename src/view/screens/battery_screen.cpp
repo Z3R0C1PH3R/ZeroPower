@@ -17,8 +17,9 @@ namespace screen {
 namespace {
 
 constexpr int32_t kW = view::kScreenWidth;
-constexpr int32_t kBarsTop = 92;
-constexpr int32_t kBarsH = 30;
+constexpr int32_t kBarsTop = 96;
+constexpr int32_t kBarsH = 26;
+constexpr int32_t kUsbTop = 74;
 constexpr int32_t kBarW = 5;
 constexpr int32_t kBarsLeft = (kW - 60 * kBarW) / 2;
 
@@ -83,6 +84,12 @@ void BatteryScreen::build_content(lv_obj_t* content) {
         bars_[i] = bar;
     }
 
+    usb_ = lv_label_create(content);
+    lv_obj_set_style_text_font(usb_, small ? small : &lv_font_montserrat_12, 0);
+    lv_obj_set_width(usb_, kW - 20);
+    lv_label_set_long_mode(usb_, LV_LABEL_LONG_CLIP);
+    lv_obj_set_pos(usb_, 10, kUsbTop);
+
     hint_ = lv_label_create(content);
     lv_obj_set_style_text_font(hint_, small ? small : &lv_font_montserrat_12, 0);
     lv_obj_align(hint_, LV_ALIGN_BOTTOM_MID, 0, -2);
@@ -106,6 +113,10 @@ bool BatteryScreen::handle_key(uint32_t key) {
 }
 
 void BatteryScreen::sample() {
+    std::vector<std::string> vendors;
+    const bool bus = platform::read_usb_vendors(vendors);
+    usb_switch_ = std::getenv("ZEROPOWER_FAKE_BATTERY") ? power::UsbSwitch::Host
+                                                        : power::usb_switch_state(bus, vendors);
     if (battery_dir_.empty()) {
         // Simulador: unos números que se mueven, para ver la pantalla.
         static int tick = 0;
@@ -205,6 +216,21 @@ void BatteryScreen::refresh() {
         lv_obj_set_style_text_color(lines_[i], colors.text, 0);
     }
     lv_obj_set_style_text_color(hint_, colors.text_disabled, 0);
+
+    // Interruptor USB: en Host el hub interno está encendido y gasta unos 90 mA más.
+    switch (usb_switch_) {
+        case power::UsbSwitch::Host:
+            set_text(usb_, "USB switch: Host \xC2\xB7 hub on, ~90 mA more");
+            lv_obj_set_style_text_color(usb_, colors.warning, 0);
+            break;
+        case power::UsbSwitch::Slave:
+            set_text(usb_, "USB switch: Slave \xC2\xB7 hub off, ~90 mA saved");
+            lv_obj_set_style_text_color(usb_, colors.success, 0);
+            break;
+        default:
+            set_text(usb_, "");
+            break;
+    }
 }
 
 void BatteryScreen::timer_cb(lv_timer_t* timer) {

@@ -148,4 +148,16 @@ ScreenTimeout::Action ScreenTimeout::update(double now_s, int brightness, bool k
     return Action::None;
 }
 
+UsbSwitch usb_switch_state(bool bus_present, const std::vector<std::string>& vendors) {
+    if (!bus_present) {
+        return UsbSwitch::Unknown;
+    }
+    for (const auto& vendor : vendors) {
+        if (vendor != "1d6b") { // cualquier cosa que no sea un root hub de Linux: el hub interno
+            return UsbSwitch::Host;
+        }
+    }
+    return UsbSwitch::Slave;
+}
+
 } // namespace power

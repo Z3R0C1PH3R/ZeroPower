@@ -16,7 +16,8 @@ namespace screen {
 /**
  * Batería: el consumo de ahora (media de los últimos 30 s, que es la cifra que sirve para
  * comparar un ajuste con otro), la carga y cuánto queda a ese ritmo. Abajo, los últimos
- * minutos en barras. R empieza la media de cero (tras cambiar un ajuste).
+ * minutos en barras. R empieza la media de cero (tras cambiar un ajuste). En medio, la
+ * posición del interruptor USB del lateral, que en Host gasta unos 90 mA más.
  */
 class BatteryScreen : public BaseScreen {
 public:
@@ -48,6 +49,8 @@ private:
     std::array<lv_obj_t*, 4> lines_{};
     std::array<lv_obj_t*, kBars> bars_{};
     lv_obj_t* hint_ = nullptr;
+    lv_obj_t* usb_ = nullptr; // posición del interruptor USB (Host gasta más)
+    power::UsbSwitch usb_switch_ = power::UsbSwitch::Unknown;
     lv_timer_t* timer_ = nullptr;
 };
 
