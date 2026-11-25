@@ -114,7 +114,7 @@ hub `1d6b`).
 
 - **0.1.4 (24-nov-2026)**: indicador del interruptor USB en *Battery* (amarillo en Host, verde
   en Slave) y su explicación en la ayuda y el README. Instalada en cpzero y vista en el aparato
-  (en Slave). **Sin probar por Bruno** en Host. **Enviada a la tienda:
+  (en Slave). Bruno la da por buena (25-nov-2026: «zero power está ok»). **Enviada a la tienda:
   [#796](https://github.com/CardputerZero/packages/pull/796).**
 - **Probada en el aparato (24-nov-2026):** Bruno la da por buena («zeropower ok»). La 0.1.3 está en la tienda ([#675](https://github.com/CardputerZero/packages/pull/675), fusionado).
 
@@ -157,6 +157,6 @@ hub `1d6b`).
     el sudoers (`visudo -c`) y `zeropowerd` (pausa el lanzador con la pantalla apagada; 0,5 %
     de CPU, 3 MB). Con el ayudante se dejaron puestos, a petición de Bruno, **Ethernet
     auto-suspend → off, escritorio HDMI off y Bluetooth off**.
-  - Entonces sin probar en el aparato (confirmado el 24-nov-2026): la app en la pantalla del Cardputer, `gpu_mem` (pide
+  - Entonces sin probar en el aparato (Bruno lo da todo por bueno el 25-nov-2026): la app en la pantalla del Cardputer, `gpu_mem` (pide
     reiniciar), Wi-Fi/Tailscale desde la app, el apagado por batería baja y `restore` al
     desinstalar.
